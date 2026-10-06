@@ -1,0 +1,29 @@
+# ARCHE voice worker. Copy to ~/.config/arche-worker/config.toml and run: chmod 600 on it.
+# The keys are secrets: with one, anyone could fetch what listeners sent to the station.
+
+# How this Mac shows up in /mod › KI-Moderation › Rechner (default: the Mac's name).
+# name = "Studio-Mac"
+
+# MP3 for listeners on their phones; 96k mono is plenty for speech.
+mp3_bitrate = "96k"
+# Keep the Mac from idle sleep while the worker runs (macOS caffeinate).
+keep_awake = true
+# A take may run this many times its expected length (plus 30 s) before it is given back.
+task_timeout_factor = 4.0
+
+[engine]
+model = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
+revision = "52f4770fd9726457eae3d3b6aa92047a25a10776"
+# Reuse a download that is already there (about 4.2 GB), for example the qwen3-tts-ui demo's:
+# hf_home = "~/Projects/schaefchens/qwen3-tts-ui/.runtime/huggingface"
+
+# One block per station, the most important first: the worker asks them in this order.
+[[stations]]
+name = "production"
+url = "https://radio.schaefchens.de"
+key = "paste the key from /mod here"
+
+# [[stations]]
+# name = "dev"
+# url = "http://localhost:8080"
+# key = "paste the dev station's key here"

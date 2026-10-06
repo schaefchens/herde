@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Starts the ARCHE voice worker at login and again if it stops.
+  Replace /Users/YOU/Projects/schaefchens/radio-app with this checkout's path (twice) and
+  YOU in the log paths, then: see worker/README.md, "Start at login".
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>de.schaefchens.arche-worker</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/YOU/Projects/schaefchens/radio-app/worker/run.sh</string>
+        <string>run</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/YOU/Projects/schaefchens/radio-app/worker</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd's PATH lacks Homebrew, where python3.13 and ffmpeg live. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <!-- Not throttled like a background job: a take must be ready before its moment airs. -->
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>StandardOutPath</key>
+    <string>/Users/YOU/Library/Logs/arche-worker.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOU/Library/Logs/arche-worker.log</string>
+</dict>
+</plist>
