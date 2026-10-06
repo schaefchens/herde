@@ -11,7 +11,7 @@
     <string>de.schaefchens.arche-worker</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/YOU/Projects/schaefchens/radio-app/worker/run.sh</string>
+        <string>/Users/YOU/Projects/schaefchens/radio-app/worker/run-arche-worker.sh</string>
         <string>run</string>
     </array>
     <key>WorkingDirectory</key>

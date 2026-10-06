@@ -25,4 +25,4 @@ if [[ ! -f "$config" ]]; then
     chmod 600 "$config"
     echo "Wrote $config: paste the key from the station's /mod there."
 fi
-echo "Ready. Next: ./run.sh check, then ./run.sh"
+echo "Ready. Next: ./run-arche-worker.sh check, then ./run-arche-worker.sh"

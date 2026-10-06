@@ -20,7 +20,7 @@ hosts that use it fall back to the next host in their lineup.
 1. Install:
 
    ```
-   worker/setup.sh
+   worker/setup-arche-worker.sh
    ```
 
    This creates `worker/.venv` and, if there is none yet, a config at
@@ -33,13 +33,13 @@ hosts that use it fall back to the next host in their lineup.
 3. Check the config, ffmpeg and each station, without loading the model:
 
    ```
-   worker/run.sh check
+   worker/run-arche-worker.sh check
    ```
 
 4. Start it:
 
    ```
-   worker/run.sh
+   worker/run-arche-worker.sh
    ```
 
    The first start downloads the model (about 4.2 GB). If the qwen3-tts-ui
@@ -47,7 +47,7 @@ hosts that use it fall back to the next host in their lineup.
    its `.runtime/huggingface` folder instead.
 
 Then, in /mod › KI-Moderation, give a host the voice "Eigener Rechner
-(Qwen)" and pick a voice per language (for German, Sohee). `worker/run.sh
+(Qwen)" and pick a voice per language (for German, Sohee). `worker/run-arche-worker.sh
 once` does a single task and stops, handy for a first try.
 
 ## Several stations
