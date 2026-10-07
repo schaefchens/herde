@@ -87,6 +87,36 @@ The log is in `~/Library/Logs/arche-worker.log`. With `keep_awake = true` the
 worker keeps the Mac from going to sleep while it runs; a closed lid on
 battery still sends it to sleep, and the hosts then fall back to other voices.
 
+## Listening test (lab)
+
+How a moment sounds depends on how its text is cut into takes (each piece is
+spoken on its own, and its delivery starts afresh) and on the temperature.
+The lab speaks the same words in several ways for you to compare by ear:
+
+1. On the station's side, write a cases file from a real stretch of the
+   program (`server/bin/replay-show.php`: each host moment as it aired and as
+   it is written now, with the voice direction each gets):
+
+   ```
+   docker compose --env-file docker/compose.env run --rm --no-deps -v "$PWD/.data/replay:/out" php \
+     php /srv/server/bin/replay-show.php --from=2026-10-07T14:00 --to=2026-10-07T18:00 --out=/out
+   ```
+
+2. Speak it on this Mac:
+
+   ```
+   worker/run-arche-worker.sh lab .data/replay/cases.json --chunks 300,whole,sentence --temperatures 0.7
+   ```
+
+   `--chunks`: a size in characters (300 is today's), `whole` (a moment in
+   one take) or `sentence` (one take per sentence); `--only 1643` speaks only
+   the cases whose id contains it. The clips land in `~/arche-lab/<date-time>/`;
+   open its `index.html` to listen side by side. A running worker shares the
+   GPU meanwhile, so its tasks take longer.
+
+3. Put what sounds best into the config's `[engine]` block, for example
+   `chunk_chars = 1100`, and restart the worker.
+
 ## Privacy
 
 The texts the worker speaks include what listeners sent: their first names,

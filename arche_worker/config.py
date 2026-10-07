@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .engine import CHUNK_CHARS, CHUNK_CHARS_MAX
+
 DEFAULT_PATH = Path.home() / ".config" / "arche-worker" / "config.toml"
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
 # The revision the qwen3-tts-ui demo pins: its download can be reused as is.
@@ -45,6 +47,7 @@ class Config:
     task_timeout_factor: float
     stations: tuple[Station, ...]
     path: Path | None = None
+    chunk_chars: int = CHUNK_CHARS
 
 
 def config_path(arg: str | None = None) -> Path:
@@ -85,6 +88,9 @@ def parse(data: dict, path: Path | None = None) -> Config:
     if not isinstance(keep_awake, bool):
         raise ConfigError("keep_awake must be true or false")
     hf_home = engine.get("hf_home")
+    chunk = engine.get("chunk_chars", CHUNK_CHARS)
+    if not isinstance(chunk, int) or isinstance(chunk, bool) or not 50 <= chunk <= CHUNK_CHARS_MAX:
+        raise ConfigError(f"[engine] chunk_chars must be a whole number between 50 and {CHUNK_CHARS_MAX}")
     return Config(
         name=str(data.get("name") or socket.gethostname())[:80],
         model=str(engine.get("model", DEFAULT_MODEL)),
@@ -95,6 +101,7 @@ def parse(data: dict, path: Path | None = None) -> Config:
         task_timeout_factor=float(factor),
         stations=stations,
         path=path,
+        chunk_chars=chunk,
     )
 
 

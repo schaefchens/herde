@@ -24,7 +24,11 @@ LANGUAGES = {
 }
 # What the station calls this model (Host\Workers matches a host's model against it).
 MODEL_NAME = "qwen3-tts-1.7b-customvoice"
+# Each piece of a text is a take of its own, and its delivery starts afresh:
+# the owner heard the host "drift" across pieces. The size is the config's
+# `chunk_chars` ([engine]); `lab` compares sizes by ear.
 CHUNK_CHARS = 300
+CHUNK_CHARS_MAX = 2000
 PAUSE_MS = 150
 # Measured on an M1 Max: German speech runs about 13 characters a second, and
 # the model makes 12.5 audio tokens a second.
@@ -82,8 +86,9 @@ def _sentence_end(chunk: str) -> bool:
     return last not in ABBREVIATIONS and not re.fullmatch(r"\w\.|\d+\.", last)
 
 
-def split_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
-    """Chunks of at most `limit` characters, cut at a sentence end once half full (the demo's rule)."""
+def split_text(text: str, limit: int = CHUNK_CHARS, every_sentence: bool = False) -> list[str]:
+    """Chunks of at most `limit` characters, cut at a sentence end once half full (the demo's rule) —
+    or, `every_sentence`, at every sentence end."""
     chunks: list[str] = []
     for paragraph in text.splitlines():
         current = ""
@@ -103,7 +108,7 @@ def split_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
                 current = word
             else:
                 current = candidate
-            if len(current) >= limit // 2 and _sentence_end(current):
+            if (every_sentence or len(current) >= limit // 2) and _sentence_end(current):
                 chunks.append(current)
                 current = ""
         if current:
@@ -112,10 +117,11 @@ def split_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
 
 
 class Engine:
-    def __init__(self, model_id: str, revision: str, hf_home: Path | None = None):
+    def __init__(self, model_id: str, revision: str, hf_home: Path | None = None, chunk_chars: int = CHUNK_CHARS):
         self.model_id = model_id
         self.revision = revision
         self.hf_home = hf_home
+        self.chunk_chars = chunk_chars
         self._model = None
 
     @property
@@ -134,10 +140,13 @@ class Engine:
             raise ValueError(f"{self.model_id} is no Qwen3-TTS CustomVoice model")
         self._model = model
 
-    def synthesize(self, text: str, voice: str, lang: str, instruct: str = "", temperature: float = 0.7, seed: int = 0) -> Speech:
+    def synthesize(
+        self, text: str, voice: str, lang: str, instruct: str = "", temperature: float = 0.7, seed: int = 0,
+        chunk_chars: int | None = None, every_sentence: bool = False,
+    ) -> Speech:
         if self._model is None:
             raise RuntimeError("model not loaded")
-        chunks = split_text(text)
+        chunks = split_text(text, chunk_chars or self.chunk_chars, every_sentence)
         if not chunks:
             raise InvalidTask("no text")
         speaker, language = voice_name(voice), language_name(lang)

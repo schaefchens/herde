@@ -44,6 +44,14 @@ def test_stations_are_needed_once_each():
         parse({"stations": [station(), station(name="again")]})
 
 
+def test_how_long_a_take_may_be_is_a_setting():
+    assert parse({"stations": [station()]}).chunk_chars == 300, "as the demo did, until the lab decides"
+    assert parse({"stations": [station()], "engine": {"chunk_chars": 1100}}).chunk_chars == 1100
+    for bad in (10, 5000, "long", True):
+        with pytest.raises(ConfigError, match="chunk_chars"):
+            parse({"stations": [station()], "engine": {"chunk_chars": bad}})
+
+
 def test_settings_are_checked():
     with pytest.raises(ConfigError):
         parse({"stations": [station()], "mp3_bitrate": "loud"})

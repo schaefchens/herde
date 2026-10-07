@@ -1,4 +1,4 @@
-"""The worker loop and its commands: `run`, `check`, `once`.
+"""The worker loop and its commands: `run`, `check`, `once`, and `lab` (a listening test).
 
 One take at a time across every station (one GPU), the stations asked in the
 config's order. While the model is not loaded nothing is polled, so the
@@ -15,6 +15,7 @@ import signal
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Callable
 
 from . import VERSION
@@ -223,9 +224,14 @@ def _keep_awake(argv: list[str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="arche-worker", description="Speak an ARCHE station's host lines with Qwen3-TTS on this Mac.")
-    parser.add_argument("command", nargs="?", default="run", choices=["run", "check", "once"])
+    parser.add_argument("command", nargs="?", default="run", choices=["run", "check", "once", "lab"])
+    parser.add_argument("cases", nargs="?", help="lab: a cases file (the station's bin/replay-show.php writes one)")
     parser.add_argument("--config", help="config file (default ~/.config/arche-worker/config.toml)")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--out", help="lab: where the clips go (default ~/arche-lab/<date-time>)")
+    parser.add_argument("--chunks", default="300,whole,sentence", help="lab: how a text is cut into takes: sizes, 'whole', 'sentence'")
+    parser.add_argument("--temperatures", default="0.7", help="lab: e.g. 0.6,0.7,0.8")
+    parser.add_argument("--only", default="", help="lab: only the cases whose id contains this")
     args = parser.parse_args(argv)
     _logging(args.verbose)
     try:
@@ -236,11 +242,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return check(config)
+    if args.command == "lab":
+        return lab_command(config, args)
     if args.command == "run" and config.keep_awake:
         _keep_awake(argv)
 
     stations = [Station(s) for s in config.stations]
-    engine = Engine(config.model, config.revision, config.hf_home)
+    engine = Engine(config.model, config.revision, config.hf_home, config.chunk_chars)
     worker = Worker(config, engine, stations)
     try:
         find_ffmpeg()
@@ -264,6 +272,32 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         for s in stations:
             s.close()
+
+
+def lab_command(config: Config, args: argparse.Namespace) -> int:
+    """Speak a cases file in several variants for a listening test (arche_worker.lab); no station is asked."""
+    from . import lab
+
+    if not args.cases:
+        log.error("lab needs a cases file: run-arche-worker.sh lab cases.json")
+        return 2
+    try:
+        cases = lab.load_cases(Path(args.cases).expanduser(), args.only)
+        chosen = lab.variants(args.chunks, args.temperatures)
+        ffmpeg = find_ffmpeg()
+    except (lab.LabError, EncodeError) as e:
+        log.error("%s", e)
+        return 2
+    out = Path(args.out).expanduser() if args.out else Path.home() / "arche-lab" / time.strftime("%Y%m%d-%H%M%S")
+    engine = Engine(config.model, config.revision, config.hf_home, config.chunk_chars)
+    # The running worker shares the GPU: its takes and these wait for each other.
+    log.info("Loading %s for %d cases × %d variants (a running worker slows down meanwhile)", config.model, len(cases), len(chosen))
+    engine.load()
+    stop = threading.Event()
+    signal.signal(signal.SIGINT, lambda *_: stop.set())
+    index = lab.run(engine.synthesize, lambda pcm, rate: encode(pcm, rate, config.mp3_bitrate, ffmpeg), cases, chosen, out, stop.is_set)
+    print(f"Listen: open {index}")
+    return 0
 
 
 def check(config: Config) -> int:

@@ -16,6 +16,9 @@ model = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
 revision = "52f4770fd9726457eae3d3b6aa92047a25a10776"
 # Reuse a download that is already there (about 4.2 GB), for example the qwen3-tts-ui demo's:
 # hf_home = "~/Projects/schaefchens/qwen3-tts-ui/.runtime/huggingface"
+# Characters per take: each piece of a text is spoken on its own (its delivery starts afresh).
+# 300 is the demo's; `run-arche-worker.sh lab` compares sizes by ear (README).
+# chunk_chars = 300
 
 # One block per station, the most important first: the worker asks them in this order.
 [[stations]]

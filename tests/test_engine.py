@@ -56,3 +56,10 @@ def test_no_take_before_the_model_is_loaded():
     assert not engine.ready
     with pytest.raises(RuntimeError):
         engine.synthesize("Hallo", "Sohee", "de")
+
+
+def test_a_whole_moment_can_be_one_take_or_one_take_per_sentence():
+    moment = "Willkommen zur Gebetsstunde. " * 20
+    assert split_text(moment.strip(), 2000) == [moment.strip()], "the whole moment in one take"
+    assert split_text("Eins ist gut. Zwei auch! Drei?", 2000, every_sentence=True) == ["Eins ist gut.", "Zwei auch!", "Drei?"]
+    assert split_text("Am 3. Oktober, z. B. hier. Und dort.", 2000, every_sentence=True) == ["Am 3. Oktober, z. B. hier.", "Und dort."], "never after an ordinal or an abbreviation"
