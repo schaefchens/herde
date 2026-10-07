@@ -281,14 +281,16 @@ def lab_command(config: Config, args: argparse.Namespace) -> int:
     if not args.cases:
         log.error("lab needs a cases file: run-arche-worker.sh lab cases.json")
         return 2
+    # run-arche-worker.sh changes into worker/: a relative path means where it was called from.
+    caller = Path(os.environ.get("ARCHE_WORKER_CALLER_DIR", "."))
     try:
-        cases = lab.load_cases(Path(args.cases).expanduser(), args.only)
+        cases = lab.load_cases(caller / Path(args.cases).expanduser(), args.only)
         chosen = lab.variants(args.chunks, args.temperatures)
         ffmpeg = find_ffmpeg()
     except (lab.LabError, EncodeError) as e:
         log.error("%s", e)
         return 2
-    out = Path(args.out).expanduser() if args.out else Path.home() / "arche-lab" / time.strftime("%Y%m%d-%H%M%S")
+    out = caller / Path(args.out).expanduser() if args.out else Path.home() / "arche-lab" / time.strftime("%Y%m%d-%H%M%S")
     engine = Engine(config.model, config.revision, config.hf_home, config.chunk_chars)
     # The running worker shares the GPU: its takes and these wait for each other.
     log.info("Loading %s for %d cases × %d variants (a running worker slows down meanwhile)", config.model, len(cases), len(chosen))
