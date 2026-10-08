@@ -23,6 +23,7 @@ from .config import Config, ConfigError, config_path, load
 from .engine import LANGUAGES, MODEL_NAME, VOICES, Engine, InvalidTask, Speech
 from .mp3 import EncodeError, encode, find_ffmpeg
 from .station import BadKey, Inactive, RateLimited, Station, StationError, Task
+from .voices import discover
 
 log = logging.getLogger("arche_worker")
 
@@ -67,7 +68,8 @@ class Worker:
             "name": self.config.name,
             "version": f"arche-worker {VERSION}",
             "engine": {"model": MODEL_NAME, "checkpoint": self.config.model, "revision": self.config.revision},
-            "voices": [{"id": v, "label": v.replace("_", " ")} for v in VOICES],
+            "voices": [{"id": v, "label": v.replace("_", " ")} for v in VOICES]
+            + [{"id": o.name, "label": f"{o.name} (own voice: {', '.join(o.languages)})"} for o in self.engine.own.values()],
             "languages": list(LANGUAGES),
             "ready": ready,
         }
@@ -221,6 +223,12 @@ def _keep_awake(argv: list[str]) -> None:
     os.execv(caffeinate, [caffeinate, "-i", sys.executable, "-m", "arche_worker", *argv])
 
 
+def engine_for(config: Config) -> Engine:
+    """Qwen's presets, and our own voices from the voices folder (a file that does not fit is left out)."""
+    own = discover(config.voices_dir, LANGUAGES, VOICES)
+    return Engine(config.model, config.revision, config.hf_home, config.chunk_chars, own, config.clone_model, config.clone_revision)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="arche-worker", description="Speak an ARCHE station's host lines with Qwen3-TTS on this Mac.")
@@ -248,11 +256,13 @@ def main(argv: list[str] | None = None) -> int:
         _keep_awake(argv)
 
     stations = [Station(s) for s in config.stations]
-    engine = Engine(config.model, config.revision, config.hf_home, config.chunk_chars)
+    engine = engine_for(config)
     worker = Worker(config, engine, stations)
     try:
         find_ffmpeg()
         log.info("Loading %s (first time: a 4 GB download)", config.model)
+        if engine.own:
+            log.info("Own voices: %s; loading %s for them too", ", ".join(f"{o.name} ({', '.join(o.languages)})" for o in engine.own.values()), config.clone_model)
         started = time.monotonic()
         engine.load()
         log.info("Model ready in %.1f s; serving %s", time.monotonic() - started, ", ".join(s.name for s in stations))
@@ -291,7 +301,7 @@ def lab_command(config: Config, args: argparse.Namespace) -> int:
         log.error("%s", e)
         return 2
     out = caller / Path(args.out).expanduser() if args.out else Path.home() / "arche-lab" / time.strftime("%Y%m%d-%H%M%S")
-    engine = Engine(config.model, config.revision, config.hf_home, config.chunk_chars)
+    engine = engine_for(config)
     # The running worker shares the GPU: its takes and these wait for each other.
     log.info("Loading %s for %d cases × %d variants (a running worker slows down meanwhile)", config.model, len(cases), len(chosen))
     engine.load()
@@ -311,7 +321,9 @@ def check(config: Config) -> int:
     except EncodeError as e:
         print(f"ffmpeg: {e}")
         ok = False
-    worker = Worker(config, Engine(config.model, config.revision, config.hf_home), [])
+    worker = Worker(config, engine_for(config), [])
+    listed = ", ".join(f"{o.name} ({', '.join(o.languages)})" for o in worker.engine.own.values())
+    print(f"own voices: {listed or 'none'} in {config.voices_dir}")
     for s in config.stations:
         station = Station(s)
         try:

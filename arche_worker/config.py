@@ -21,6 +21,9 @@ DEFAULT_PATH = Path.home() / ".config" / "arche-worker" / "config.toml"
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
 # The revision the qwen3-tts-ui demo pins: its download can be reused as is.
 DEFAULT_REVISION = "52f4770fd9726457eae3d3b6aa92047a25a10776"
+# Qwen's Base model clones our own voices (arche_worker.voices); loaded only when there is one.
+DEFAULT_CLONE_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
+DEFAULT_CLONE_REVISION = "a6eb4f68e4b056f1215157bb696209bc82a6db48"
 # Plain http only to this machine: anything else would send the key in the clear.
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
@@ -48,6 +51,10 @@ class Config:
     stations: tuple[Station, ...]
     path: Path | None = None
     chunk_chars: int = CHUNK_CHARS
+    clone_model: str = DEFAULT_CLONE_MODEL
+    clone_revision: str = DEFAULT_CLONE_REVISION
+    # Our own voices' recordings: next to the config unless [clone] voices says otherwise.
+    voices_dir: Path = DEFAULT_PATH.parent / "voices"
 
 
 def config_path(arg: str | None = None) -> Path:
@@ -88,6 +95,12 @@ def parse(data: dict, path: Path | None = None) -> Config:
     if not isinstance(keep_awake, bool):
         raise ConfigError("keep_awake must be true or false")
     hf_home = engine.get("hf_home")
+    clone = data.get("clone", {})
+    if not isinstance(clone, dict):
+        raise ConfigError("[clone] must be a table")
+    voices = clone.get("voices")
+    if voices is not None and (not isinstance(voices, str) or not voices.strip()):
+        raise ConfigError("[clone] voices must be a folder")
     chunk = engine.get("chunk_chars", CHUNK_CHARS)
     if not isinstance(chunk, int) or isinstance(chunk, bool) or not 50 <= chunk <= CHUNK_CHARS_MAX:
         raise ConfigError(f"[engine] chunk_chars must be a whole number between 50 and {CHUNK_CHARS_MAX}")
@@ -102,6 +115,9 @@ def parse(data: dict, path: Path | None = None) -> Config:
         stations=stations,
         path=path,
         chunk_chars=chunk,
+        clone_model=str(clone.get("model", DEFAULT_CLONE_MODEL)),
+        clone_revision=str(clone.get("revision", DEFAULT_CLONE_REVISION)),
+        voices_dir=Path(voices).expanduser() if voices else (path.parent if path else DEFAULT_PATH.parent) / "voices",
     )
 
 

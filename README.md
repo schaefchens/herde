@@ -12,7 +12,8 @@ hosts that use it fall back to the next host in their lineup.
 
 - A Mac with Apple Silicon (M1 or newer). An M1 Max speaks about twice as
   fast as real time: 10 seconds of speech take about 5 seconds.
-- About 5 GB of disk for the model (downloaded once).
+- About 5 GB of disk for the model (downloaded once), 4 GB more for voices of
+  your own.
 - Python 3.13 and ffmpeg: `brew install python@3.13 ffmpeg`.
 
 ## Set up
@@ -116,6 +117,33 @@ The lab speaks the same words in several ways for you to compare by ear:
 
 3. Put what sounds best into the config's `[engine]` block, for example
    `chunk_chars = 1100`, and restart the worker.
+
+## Voices of your own
+
+Qwen's nine presets are fixed voices. A voice of your own is cloned from a
+recording by Qwen's Base model (about 4 GB more on disk and in memory, loaded
+only when there is one):
+
+1. Put two files per language into `~/.config/arche-worker/voices/` (next to
+   the config; `[clone] voices` names another folder), for example
+   `Faith.de.wav`, a recording of 3 to 30 seconds (PCM WAV), and
+   `Faith.de.txt`, exactly what it says. A language without a recording
+   borrows another one's: Qwen carries a voice across languages, with an
+   accent.
+2. Restart the worker. `run-arche-worker.sh check` lists the voices it found;
+   the log says why a file was left out (a name like a preset's, no words, too
+   short or too long).
+3. In /mod › KI-Moderation, pick "Faith (own voice: de, en)" for the host in
+   each language, as you would a preset. Only computers that have the voice
+   offer it: copy its files to every Mac that should speak it.
+
+The clone speaks every take in that voice, the same woman each time, but it
+takes no direction: neither the host's voice direction nor a moment's
+delivery reaches it. Its words, and how the recording sounds, carry the
+feeling, so the recording should already be in the host's tone. Faith's comes
+from Qwen's VoiceDesign, a voice made from a description; on its own,
+VoiceDesign made a slightly different woman in each take. A recording of a
+real person only with their consent.
 
 ## Privacy
 

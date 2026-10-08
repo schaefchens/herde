@@ -1,6 +1,8 @@
-"""Qwen3-TTS (CustomVoice) through mlx-audio on the Mac's GPU.
+"""Qwen3-TTS through mlx-audio on the Mac's GPU: CustomVoice for Qwen's
+presets, and Base for voices of our own, cloned from a recording
+(arche_worker.voices).
 
-mlx-audio is imported only when the model loads: the tests, and `check`,
+mlx-audio is imported only when the models load: the tests, and `check`,
 run without it.
 """
 
@@ -12,6 +14,8 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from .voices import OwnVoice, Reference
 
 log = logging.getLogger(__name__)
 
@@ -117,12 +121,21 @@ def split_text(text: str, limit: int = CHUNK_CHARS, every_sentence: bool = False
 
 
 class Engine:
-    def __init__(self, model_id: str, revision: str, hf_home: Path | None = None, chunk_chars: int = CHUNK_CHARS):
+    def __init__(
+        self, model_id: str, revision: str, hf_home: Path | None = None, chunk_chars: int = CHUNK_CHARS,
+        own: dict[str, OwnVoice] | None = None, clone_model: str = "", clone_revision: str = "",
+    ):
         self.model_id = model_id
         self.revision = revision
         self.hf_home = hf_home
         self.chunk_chars = chunk_chars
+        # Our own voices by lower-case name; the Base model is loaded only for them.
+        self.own = own or {}
+        self.clone_model = clone_model
+        self.clone_revision = clone_revision
         self._model = None
+        self._clone = None
+        self._refs: dict[Path, object] = {}
 
     @property
     def ready(self) -> bool:
@@ -138,7 +151,23 @@ class Engine:
         model = load_model(self.model_id, revision=self.revision)
         if model.config.tts_model_type != "custom_voice":
             raise ValueError(f"{self.model_id} is no Qwen3-TTS CustomVoice model")
+        if self.own:
+            from mlx_audio.utils import load_audio
+
+            clone = load_model(self.clone_model, revision=self.clone_revision or None)
+            if clone.config.tts_model_type != "base":
+                raise ValueError(f"{self.clone_model} is no Qwen3-TTS Base model")
+            # Read once: mlx-audio keeps a recording's encoding for the takes after the first.
+            self._refs = {ref.path: load_audio(str(ref.path), sample_rate=clone.sample_rate)
+                          for voice in self.own.values() for ref in voice.refs.values()}
+            self._clone = clone
+        # Last: ready means every model a task may name is there.
         self._model = model
+
+    def route(self, voice: str, lang: str) -> Reference | str:
+        """What speaks a task: our own voice's recording for its language, or the name of Qwen's preset."""
+        own = self.own.get(voice.strip().lower())
+        return own.reference(lang) if own is not None else voice_name(voice)
 
     def synthesize(
         self, text: str, voice: str, lang: str, instruct: str = "", temperature: float = 0.7, seed: int = 0,
@@ -149,7 +178,7 @@ class Engine:
         chunks = split_text(text, chunk_chars or self.chunk_chars, every_sentence)
         if not chunks:
             raise InvalidTask("no text")
-        speaker, language = voice_name(voice), language_name(lang)
+        target, language = self.route(voice, lang), language_name(lang)
         import mlx.core as mx
         import numpy as np
 
@@ -160,11 +189,19 @@ class Engine:
             if parts and sample_rate is not None:
                 # A short breath between chunks instead of words run together.
                 parts.append(np.zeros(sample_rate * PAUSE_MS // 1000, dtype=np.float32))
-            for result in self._model.generate_custom_voice(
-                text=chunk, speaker=speaker, language=language, instruct=instruct or None,
-                temperature=max(0.0, min(2.0, float(temperature))), max_tokens=max_tokens(chunk),
-                top_k=50, top_p=1.0, repetition_penalty=REPETITION_PENALTY, stream=False, verbose=False,
-            ):
+            sampling = {
+                "temperature": max(0.0, min(2.0, float(temperature))), "max_tokens": max_tokens(chunk),
+                "top_k": 50, "top_p": 1.0, "repetition_penalty": REPETITION_PENALTY, "stream": False, "verbose": False,
+            }
+            if isinstance(target, Reference):
+                # The clone reads its recording with the recording's words, then speaks on in that voice.
+                # It takes no direction: the moment's delivery stays unused.
+                takes = self._clone.generate(
+                    text=chunk, ref_audio=self._refs[target.path], ref_text=target.text, lang_code=language.lower(), **sampling,
+                )
+            else:
+                takes = self._model.generate_custom_voice(text=chunk, speaker=target, language=language, instruct=instruct or None, **sampling)
+            for result in takes:
                 if sample_rate is not None and result.sample_rate != sample_rate:
                     raise RuntimeError("the model changed its sample rate between chunks")
                 sample_rate = int(result.sample_rate)

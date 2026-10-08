@@ -52,10 +52,11 @@ class FakeStation:
 
 
 class FakeEngine:
-    def __init__(self, ready=True, error=None, block=None):
+    def __init__(self, ready=True, error=None, block=None, own=None):
         self.ready = ready
         self.error = error
         self.block = block
+        self.own = own or {}
         self.calls = []
 
     def synthesize(self, *args):
@@ -107,6 +108,20 @@ def test_a_task_is_spoken_and_uploaded():
     body = upload.content
     assert b'name="audio"; filename="7.mp3"' in body and b"Content-Type: audio/mpeg" in body and b"MP3DATA" in body
     assert b'name="ms"\r\n\r\n1000' in body
+
+
+def test_our_own_voices_are_offered_after_the_presets(tmp_path):
+    from arche_worker.voices import discover
+    from test_voices import recording
+
+    recording(tmp_path, "Faith.de")
+    recording(tmp_path, "Faith.en")
+    station = FakeStation()
+    w = worker([station], FakeEngine(own=discover(tmp_path, ("de", "en"), ("Sohee",))))
+    w.step()
+    voices = json.loads(station.requests[0].content)["voices"]
+    assert len(voices) == 10 and voices[-1] == {"id": "Faith", "label": "Faith (own voice: de, en)"}
+    assert len(voices[-1]["label"]) <= 60, "the station keeps 60 characters of a label"
 
 
 def test_a_retake_or_a_task_gone_reports_no_failure(caplog):

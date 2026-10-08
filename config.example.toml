@@ -20,6 +20,13 @@ revision = "52f4770fd9726457eae3d3b6aa92047a25a10776"
 # 300 is the demo's; `run-arche-worker.sh lab` compares sizes by ear (README).
 # chunk_chars = 300
 
+# Voices of our own (README: "Voices of your own"): <Name>.<lang>.wav and <Name>.<lang>.txt
+# in this folder, cloned by Qwen's Base model. Without any, Base is never loaded.
+# [clone]
+# voices = "~/.config/arche-worker/voices"
+# model = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
+# revision = "a6eb4f68e4b056f1215157bb696209bc82a6db48"
+
 # One block per station, the most important first: the worker asks them in this order.
 [[stations]]
 name = "production"

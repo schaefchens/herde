@@ -63,3 +63,17 @@ def test_a_whole_moment_can_be_one_take_or_one_take_per_sentence():
     assert split_text(moment.strip(), 2000) == [moment.strip()], "the whole moment in one take"
     assert split_text("Eins ist gut. Zwei auch! Drei?", 2000, every_sentence=True) == ["Eins ist gut.", "Zwei auch!", "Drei?"]
     assert split_text("Am 3. Oktober, z. B. hier. Und dort.", 2000, every_sentence=True) == ["Am 3. Oktober, z. B. hier.", "Und dort."], "never after an ordinal or an abbreviation"
+
+
+def test_an_own_voice_is_spoken_from_its_recording_and_a_preset_by_its_name(tmp_path):
+    from arche_worker.voices import discover
+    from test_voices import recording
+
+    recording(tmp_path, "Faith.de")
+    recording(tmp_path, "Faith.en")
+    engine = Engine("model", "rev", own=discover(tmp_path, ("de", "en"), ("Sohee",)))
+    assert engine.route("faith", "de").path.name == "Faith.de.wav", "by name, in any case, as the station sends it"
+    assert engine.route("Faith", "en").path.name == "Faith.en.wav"
+    assert engine.route("sohee", "de") == "Sohee"
+    with pytest.raises(InvalidTask):
+        engine.route("Hope", "de")

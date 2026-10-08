@@ -80,3 +80,16 @@ def test_the_path_from_the_environment(monkeypatch, tmp_path):
     monkeypatch.setenv("ARCHE_WORKER_CONFIG", str(tmp_path / "c.toml"))
     assert config_path() == tmp_path / "c.toml"
     assert config_path(str(tmp_path / "x.toml")) == tmp_path / "x.toml"
+
+
+def test_own_voices_live_next_to_the_config_unless_told_otherwise(tmp_path):
+    from arche_worker.config import DEFAULT_CLONE_MODEL, DEFAULT_CLONE_REVISION
+
+    c = parse({"stations": [station()]}, tmp_path / "config.toml")
+    assert (c.clone_model, c.clone_revision, c.voices_dir) == (DEFAULT_CLONE_MODEL, DEFAULT_CLONE_REVISION, tmp_path / "voices")
+    c = parse({"stations": [station()], "clone": {"voices": "~/voices", "model": "local/base", "revision": "abc"}})
+    assert (c.clone_model, c.clone_revision, c.voices_dir) == ("local/base", "abc", __import__("pathlib").Path.home() / "voices")
+    with pytest.raises(ConfigError, match=r"\[clone\]"):
+        parse({"stations": [station()], "clone": "voices"})
+    with pytest.raises(ConfigError, match="folder"):
+        parse({"stations": [station()], "clone": {"voices": ""}})
