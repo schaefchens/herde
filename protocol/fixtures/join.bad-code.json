@@ -1,0 +1,19 @@
+{
+  "call": "join",
+  "about": "Wrong, used or expired: the same answer for all three.",
+  "request": {
+    "code": "AAAA-BBBB-CCCC-DDDD",
+    "name": "Peter's PC",
+    "version": "herde/0.2.0",
+    "platform": {
+      "os": "linux",
+      "arch": "x86_64"
+    }
+  },
+  "response": {
+    "status": 401,
+    "body": {
+      "error": "bad_code"
+    }
+  }
+}

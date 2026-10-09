@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from arche_worker import mp3
+from herde.engines.tts import mp3
 
 
 def test_the_ffmpeg_command():

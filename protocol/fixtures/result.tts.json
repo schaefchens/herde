@@ -1,0 +1,21 @@
+{
+  "call": "result",
+  "task": 52,
+  "about": "Speech as multipart: the lease, its length, and the MP3 as the file `audio`.",
+  "request": {
+    "multipart": {
+      "lease": "4d8f0b2e-7c1a-4b5e-9f3d-2a6c8e1b0d47",
+      "ms": "21400"
+    },
+    "file": {
+      "field": "audio",
+      "type": "audio/mpeg"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true
+    }
+  }
+}

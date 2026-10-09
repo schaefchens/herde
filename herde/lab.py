@@ -1,8 +1,8 @@
 """The listening lab: the same words spoken in several ways, to choose by ear.
 
-`run-arche-worker.sh lab cases.json` speaks every case of a cases file
-(the station's bin/replay-show.php writes one: each host moment as it aired
-and as it is written now) in each variant — how the text is cut into takes,
+`herde lab cases.json` speaks every case of a cases file (ARCHE's
+bin/replay-show.php writes one: each host moment as it aired and as it is
+written now) in each variant — how the text is cut into takes,
 and the temperature — and writes the MP3s with an index.html to listen to
 them side by side. Nothing is sent anywhere.
 """
@@ -14,11 +14,11 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
-from .engine import CHUNK_CHARS_MAX, InvalidTask, Speech
+from .engines.tts.core import CHUNK_CHARS_MAX, InvalidTask, Speech
 
 log = logging.getLogger(__name__)
 
@@ -143,9 +143,9 @@ def _write_index(out: Path, cases: list[Case], chosen: list[Variant], files: dic
             f"<br><small><i>{html.escape(c.instruct)}</i></small></td>{''.join(cells)}</tr>"
         )
     (out / "index.html").write_text(
-        "<!doctype html><meta charset=utf-8><title>ARCHE voice lab</title>"
+        "<!doctype html><meta charset=utf-8><title>herde voice lab</title>"
         "<style>body{font:14px system-ui;margin:16px}td,th{border-bottom:1px solid #ccc;padding:8px;vertical-align:top;text-align:left}"
         "td:first-child{max-width:520px}</style>"
-        f"<h1>ARCHE voice lab</h1><table><tr><th>What is said, and how it is directed</th>{head}</tr>{''.join(rows)}</table>",
+        f"<h1>herde voice lab</h1><table><tr><th>What is said, and how it is directed</th>{head}</tr>{''.join(rows)}</table>",
         encoding="utf-8",
     )

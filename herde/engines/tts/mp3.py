@@ -1,11 +1,11 @@
-"""16-bit PCM to MP3 through ffmpeg: the station plays MP3 and has no encoder of its own."""
+"""16-bit PCM to MP3 through ffmpeg: projects play MP3, and a shared host has no encoder of its own."""
 
 from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 # A launchd job's PATH lacks Homebrew: look there too.
 HOMEBREW_FFMPEG = Path("/opt/homebrew/bin/ffmpeg")
@@ -21,7 +21,7 @@ def find_ffmpeg() -> str:
         return found
     if HOMEBREW_FFMPEG.is_file():
         return str(HOMEBREW_FFMPEG)
-    raise EncodeError("ffmpeg not found; install it with: brew install ffmpeg")
+    raise EncodeError("ffmpeg not found; install it (on a Mac: brew install ffmpeg)")
 
 
 def command(ffmpeg: str, sample_rate: int, bitrate: str) -> list[str]:

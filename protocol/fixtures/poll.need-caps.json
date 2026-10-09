@@ -1,0 +1,33 @@
+{
+  "call": "poll",
+  "about": "The project does not know this hash: the next poll carries the caps.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "running": [],
+    "free": {
+      "tts": 1,
+      "text": 1
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011270,
+      "offers": [],
+      "cancel": [],
+      "need_caps": true,
+      "retry_after": 2
+    }
+  }
+}

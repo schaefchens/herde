@@ -1,12 +1,12 @@
 """Voices of our own: a recording per language that Qwen3-TTS's Base model
-clones in every take (station decision 2026-10-08: Faith's deep radio voice,
+clones in every take (ARCHE's decision 2026-10-08: Faith's deep radio voice,
 made with Qwen's VoiceDesign and kept as one take — VoiceDesign alone made a
 slightly different woman in each take, the clone stays one).
 
-A voice is two files per language in the voices folder ([clone] voices):
+A voice is two files per language in the voices folder ([tts] voices):
 <Name>.<lang>.wav, the recording, and <Name>.<lang>.txt, exactly what it says
 (the model reads the recording together with its words). The worker offers
-the voice by its name next to Qwen's presets, and the station picks it like
+the voice by its name next to Qwen's presets, and a project picks it like
 one. The clone takes no direction: a moment's delivery does not reach it —
 the words, and how the recording sounds, carry the feeling.
 
@@ -24,7 +24,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-# What the station takes as a worker voice's id (Host\Workers::poll).
+# A voice id as the protocol allows it (schema.json VoiceId).
 NAME = re.compile(r"[A-Za-z0-9_-]{1,40}")
 # Enough of a voice to carry it, and short: every take reads the whole recording first.
 MIN_SECONDS = 3.0
@@ -55,7 +55,7 @@ class OwnVoice:
 
 def discover(folder: Path, languages: Iterable[str], presets: Iterable[str]) -> dict[str, OwnVoice]:
     """The voices in `folder`, by lower-case name. A file that does not fit is left out with a warning:
-    a voice that cannot be spoken must not be offered to a station."""
+    a voice that cannot be spoken must not be offered to a project."""
     if not folder.is_dir():
         return {}
     langs = {lang.lower() for lang in languages}
@@ -68,7 +68,7 @@ def discover(folder: Path, languages: Iterable[str], presets: Iterable[str]) -> 
         if not NAME.fullmatch(name) or lang not in langs:
             log.warning("voices: %s is not named <Name>.<language>.wav; left out", wav.name)
             continue
-        # A preset's name would be two voices behind one id at the station.
+        # A preset's name would be two voices behind one id at a project.
         if name.lower() in taken:
             log.warning("voices: %s is the name of one of Qwen's presets; left out", wav.name)
             continue

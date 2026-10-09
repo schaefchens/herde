@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from arche_worker.engine import InvalidTask, Speech
-from arche_worker.lab import Case, LabError, load_cases, run, variants
+from herde.engines.tts.core import InvalidTask, Speech
+from herde.lab import Case, LabError, load_cases, run, variants
 
 
 def test_variants_are_sizes_whole_or_sentence_at_each_temperature():

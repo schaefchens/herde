@@ -1,0 +1,14 @@
+{
+  "call": "claim",
+  "task": 52,
+  "about": "Taken by another worker, cancelled, too late, or not this worker's business: one answer for all.",
+  "request": {
+    "lease": "4d8f0b2e-7c1a-4b5e-9f3d-2a6c8e1b0d47"
+  },
+  "response": {
+    "status": 409,
+    "body": {
+      "error": "gone"
+    }
+  }
+}

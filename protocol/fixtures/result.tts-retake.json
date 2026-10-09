@@ -1,0 +1,22 @@
+{
+  "call": "result",
+  "task": 52,
+  "about": "Its length does not fit its words: back in the queue with another seed.",
+  "request": {
+    "multipart": {
+      "lease": "4d8f0b2e-7c1a-4b5e-9f3d-2a6c8e1b0d47",
+      "ms": "61400"
+    },
+    "file": {
+      "field": "audio",
+      "type": "audio/mpeg"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": false,
+      "retake": true
+    }
+  }
+}

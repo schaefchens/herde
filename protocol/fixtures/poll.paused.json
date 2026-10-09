@@ -1,0 +1,34 @@
+{
+  "call": "poll",
+  "about": "Paused by its owner (or outside its hours): online, takes nothing, back in an hour.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "paused",
+    "resume_in": 3600,
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "running": [],
+    "free": {
+      "tts": 0,
+      "text": 0
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011260,
+      "offers": [],
+      "cancel": [],
+      "need_caps": false,
+      "retry_after": 30
+    }
+  }
+}

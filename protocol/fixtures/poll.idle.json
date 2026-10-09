@@ -1,0 +1,33 @@
+{
+  "call": "poll",
+  "about": "Nothing changed and nothing waits: the project writes nothing and asks again later.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "running": [],
+    "free": {
+      "tts": 1,
+      "text": 1
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011240,
+      "offers": [],
+      "cancel": [],
+      "need_caps": false,
+      "retry_after": 15
+    }
+  }
+}

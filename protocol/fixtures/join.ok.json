@@ -1,0 +1,30 @@
+{
+  "call": "join",
+  "about": "A one-time invite turned into a key; trust comes from the invite.",
+  "request": {
+    "code": "7KQ3-M2XP-4HVA-9DZE-QW8N-BT6R-YC",
+    "name": "Peter's PC",
+    "version": "herde/0.2.0",
+    "platform": {
+      "os": "linux",
+      "arch": "x86_64",
+      "accelerator": "NVIDIA GeForce RTX 4070",
+      "memory_gb": 32
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "key": "9c1e000000000000000000000000000000000000000000000000000000004f2a",
+      "worker": {
+        "id": 7,
+        "name": "Peter's PC",
+        "trust": "lender"
+      },
+      "project": {
+        "name": "ARCHE",
+        "protocol": 2
+      }
+    }
+  }
+}

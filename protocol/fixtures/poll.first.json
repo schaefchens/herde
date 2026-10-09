@@ -1,0 +1,161 @@
+{
+  "call": "poll",
+  "about": "The first poll after a start carries the caps; the project answers with what this worker may do, most urgent first.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "caps": {
+      "name": "studio-mac",
+      "platform": {
+        "os": "darwin",
+        "arch": "arm64",
+        "accelerator": "Apple M1 Max",
+        "memory_gb": 64
+      },
+      "engines": [
+        {
+          "kind": "tts",
+          "model": "qwen3-tts-1.7b",
+          "location": "local",
+          "voices": [
+            {
+              "id": "Sohee",
+              "label": "Sohee",
+              "langs": [
+                "de",
+                "en",
+                "es",
+                "fr",
+                "it",
+                "ja",
+                "ko",
+                "pt",
+                "ru",
+                "zh"
+              ],
+              "instruct": true
+            },
+            {
+              "id": "Serena",
+              "label": "Serena",
+              "langs": [
+                "de",
+                "en",
+                "es",
+                "fr",
+                "it",
+                "ja",
+                "ko",
+                "pt",
+                "ru",
+                "zh"
+              ],
+              "instruct": true
+            },
+            {
+              "id": "Faith",
+              "label": "Faith (own voice)",
+              "langs": [
+                "de",
+                "en"
+              ],
+              "instruct": false,
+              "own": true
+            }
+          ],
+          "max_chars": 2000,
+          "speed": {
+            "chars_per_s": 7
+          }
+        },
+        {
+          "kind": "text",
+          "model": "gemma4-31b",
+          "location": "local",
+          "json_schema": true,
+          "context": 32768,
+          "max_tokens": 4096,
+          "loaded": true,
+          "speed": {
+            "read_tps": 67,
+            "write_tps": 11,
+            "load_s": 15
+          }
+        }
+      ]
+    },
+    "running": [],
+    "free": {
+      "tts": 1,
+      "text": 1
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011234,
+      "offers": [
+        {
+          "task": 52,
+          "kind": "tts",
+          "class": "live",
+          "model": "qwen3-tts-1.7b",
+          "voice": "Sohee",
+          "lang": "de",
+          "size": {
+            "chars": 312
+          },
+          "claim_in": 141,
+          "due_in": 171
+        },
+        {
+          "task": 53,
+          "kind": "tts",
+          "class": "live",
+          "model": "qwen3-tts-1.7b",
+          "voice": "Sohee",
+          "lang": "en",
+          "size": {
+            "chars": 287
+          },
+          "claim_in": 141,
+          "due_in": 171
+        },
+        {
+          "task": 60,
+          "kind": "text",
+          "class": "background",
+          "model": "gemma4-31b",
+          "size": {
+            "input_tokens": 3912,
+            "max_tokens": 1024
+          }
+        },
+        {
+          "task": 61,
+          "kind": "tts",
+          "class": "background",
+          "model": "qwen3-tts-1.7b",
+          "voice": "Faith",
+          "lang": "de",
+          "size": {
+            "chars": 140
+          }
+        }
+      ],
+      "cancel": [],
+      "need_caps": false,
+      "retry_after": 2
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "call": "join",
+  "about": "Too many wrong codes from one address.",
+  "request": {
+    "code": "AAAA-BBBB-CCCC-DDDD",
+    "name": "x",
+    "version": "herde/0.2.0",
+    "platform": {
+      "os": "linux",
+      "arch": "x86_64"
+    }
+  },
+  "response": {
+    "status": 429,
+    "body": {
+      "error": "rate_limited",
+      "retry_after": 600
+    }
+  }
+}

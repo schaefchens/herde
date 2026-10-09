@@ -1,0 +1,27 @@
+{
+  "call": "result",
+  "task": 60,
+  "about": "A text answer as JSON.",
+  "request": {
+    "lease": "4d8f0b2e-7c1a-4b5e-9f3d-2a6c8e1b0d47",
+    "output": {
+      "content": "{\"de\": \"Schön, dass ihr da seid.\", \"en\": \"Good to have you here.\", \"delivery\": \"Warm.\"}",
+      "finish": "stop",
+      "usage": {
+        "input_tokens": 3912,
+        "output_tokens": 288
+      },
+      "timings": {
+        "load_ms": 0,
+        "read_ms": 5840,
+        "write_ms": 26100
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "ok": true
+    }
+  }
+}

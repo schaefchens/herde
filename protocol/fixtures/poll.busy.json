@@ -1,0 +1,48 @@
+{
+  "call": "poll",
+  "about": "A heartbeat while speaking: the running task's lease is kept alive; another one it held was cancelled meanwhile.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "running": [
+      {
+        "task": 41,
+        "lease": "b5e12c7a-9d4f-4e1b-a3c8-6f2d0e9b7a15",
+        "progress": 0.5
+      },
+      {
+        "task": 40,
+        "lease": "a9c05e1f-3b7d-4c2a-8e6f-1d0b9a7c5e32"
+      }
+    ],
+    "free": {
+      "tts": 0,
+      "text": 0
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011250,
+      "offers": [],
+      "cancel": [
+        {
+          "task": 40,
+          "lease": "a9c05e1f-3b7d-4c2a-8e6f-1d0b9a7c5e32"
+        }
+      ],
+      "need_caps": false,
+      "retry_after": 5
+    }
+  }
+}

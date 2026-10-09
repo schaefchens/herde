@@ -1,0 +1,28 @@
+{
+  "call": "poll",
+  "about": "A key the project does not know (or no key).",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "running": [],
+    "free": {
+      "tts": 1
+    }
+  },
+  "response": {
+    "status": 401,
+    "body": {
+      "error": "bad_worker_key"
+    }
+  }
+}

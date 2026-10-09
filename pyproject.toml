@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "herde"
+version = "0.2.0"
+description = "A worker that does AI work — speech, text — for projects that host the herde protocol; it connects out, so it works behind any firewall."
+readme = "README.md"
+requires-python = ">=3.12"
+# The worker itself needs only an HTTP client: models come with the extras.
+dependencies = ["httpx>=0.28,<0.29"]
+
+[project.optional-dependencies]
+# Qwen3-TTS on Apple's GPU. The tested set of every package is macos/requirements-mlx.lock
+# (the versions the qwen3-tts-ui demo runs on an M1 Max); install.sh installs that.
+mlx = ["mlx==0.32.3", "mlx-metal==0.32.3", "mlx-audio==0.5.8", "numpy==2.5.3", "transformers==5.18.0", "huggingface_hub==1.33.0"]
+# Qwen3-TTS on NVIDIA through the official package. torch comes from PyTorch's CUDA index
+# (docker/Dockerfile): from PyPI it would be another build.
+cuda = ["qwen-tts==0.1.1", "torch>=2.6", "numpy>=2"]
+dev = ["pytest>=8", "jsonschema>=4.23", "ruff>=0.15"]
+
+[project.scripts]
+herde = "herde.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["herde*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 190
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# Comments and messages use typographic quotes and dashes on purpose.
+ignore = ["RUF001", "RUF002", "RUF003", "SIM105", "SIM108"]

@@ -1,0 +1,353 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/schaefchens/herde/protocol/schema.json",
+  "title": "herde protocol 2",
+  "description": "Every message between a herde worker and a project (PROTOCOL.md). Unknown fields are allowed everywhere: both sides ignore what they do not know.",
+  "$defs": {
+    "TaskId": {"type": "integer", "minimum": 1},
+    "Lease": {"type": "string", "pattern": "^[A-Za-z0-9-]{8,64}$"},
+    "Kind": {"enum": ["tts", "text", "stt"]},
+    "Class": {"enum": ["live", "interactive", "background"]},
+    "Lang": {"type": "string", "pattern": "^[a-z]{2}$"},
+    "VoiceId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$"},
+    "Model": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
+    "Seconds": {"type": "integer", "minimum": 0},
+    "Trust": {"enum": ["own", "lender"]},
+    "Location": {"enum": ["local", "cloud"]},
+    "KindVersions": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/Kind"},
+      "additionalProperties": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 1}
+    },
+    "Platform": {
+      "type": "object",
+      "required": ["os", "arch"],
+      "properties": {
+        "os": {"type": "string", "maxLength": 40},
+        "arch": {"type": "string", "maxLength": 40},
+        "accelerator": {"type": "string", "maxLength": 120},
+        "memory_gb": {"type": "number", "minimum": 0}
+      }
+    },
+
+    "JoinRequest": {
+      "type": "object",
+      "required": ["code", "name", "version", "platform"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Za-z0-9-]{8,80}$"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 80},
+        "version": {"type": "string", "maxLength": 40},
+        "platform": {"$ref": "#/$defs/Platform"}
+      }
+    },
+    "JoinResponse": {
+      "type": "object",
+      "required": ["key", "worker", "project"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^\\S{32,200}$"},
+        "worker": {
+          "type": "object",
+          "required": ["id", "name", "trust"],
+          "properties": {
+            "id": {"type": "integer", "minimum": 1},
+            "name": {"type": "string", "maxLength": 80},
+            "trust": {"$ref": "#/$defs/Trust"}
+          }
+        },
+        "project": {
+          "type": "object",
+          "required": ["name", "protocol"],
+          "properties": {
+            "name": {"type": "string", "maxLength": 80},
+            "protocol": {"const": 2}
+          }
+        }
+      }
+    },
+
+    "Voice": {
+      "type": "object",
+      "required": ["id", "label", "langs", "instruct"],
+      "properties": {
+        "id": {"$ref": "#/$defs/VoiceId"},
+        "label": {"type": "string", "maxLength": 60},
+        "langs": {"type": "array", "items": {"$ref": "#/$defs/Lang"}, "maxItems": 40},
+        "instruct": {"type": "boolean"},
+        "own": {"type": "boolean"}
+      }
+    },
+    "TtsEngine": {
+      "type": "object",
+      "required": ["kind", "model", "location", "voices", "max_chars"],
+      "properties": {
+        "kind": {"const": "tts"},
+        "model": {"$ref": "#/$defs/Model"},
+        "location": {"$ref": "#/$defs/Location"},
+        "voices": {"type": "array", "items": {"$ref": "#/$defs/Voice"}, "maxItems": 100},
+        "max_chars": {"type": "integer", "minimum": 1},
+        "speed": {
+          "type": "object",
+          "properties": {"chars_per_s": {"type": "number", "exclusiveMinimum": 0}}
+        }
+      }
+    },
+    "TextEngine": {
+      "type": "object",
+      "required": ["kind", "model", "location", "json_schema", "context", "max_tokens"],
+      "properties": {
+        "kind": {"const": "text"},
+        "model": {"$ref": "#/$defs/Model"},
+        "location": {"$ref": "#/$defs/Location"},
+        "json_schema": {"type": "boolean"},
+        "context": {"type": "integer", "minimum": 1},
+        "max_tokens": {"type": "integer", "minimum": 1},
+        "loaded": {"type": "boolean"},
+        "speed": {
+          "type": "object",
+          "properties": {
+            "read_tps": {"type": "number", "exclusiveMinimum": 0},
+            "write_tps": {"type": "number", "exclusiveMinimum": 0},
+            "load_s": {"type": "number", "minimum": 0}
+          }
+        }
+      }
+    },
+    "Caps": {
+      "type": "object",
+      "required": ["name", "platform", "engines"],
+      "properties": {
+        "name": {"type": "string", "maxLength": 80},
+        "platform": {"$ref": "#/$defs/Platform"},
+        "engines": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {"kind": {"$ref": "#/$defs/Kind"}},
+            "allOf": [
+              {"if": {"properties": {"kind": {"const": "tts"}}}, "then": {"$ref": "#/$defs/TtsEngine"}},
+              {"if": {"properties": {"kind": {"const": "text"}}}, "then": {"$ref": "#/$defs/TextEngine"}}
+            ]
+          }
+        }
+      }
+    },
+
+    "PollRequest": {
+      "type": "object",
+      "required": ["protocol", "version", "kinds", "state", "caps_hash", "running", "free"],
+      "properties": {
+        "protocol": {"const": 2},
+        "version": {"type": "string", "maxLength": 40},
+        "kinds": {"$ref": "#/$defs/KindVersions"},
+        "state": {"enum": ["ready", "paused", "loading"]},
+        "resume_in": {"$ref": "#/$defs/Seconds"},
+        "caps_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "caps": {"$ref": "#/$defs/Caps"},
+        "running": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["task", "lease"],
+            "properties": {
+              "task": {"$ref": "#/$defs/TaskId"},
+              "lease": {"$ref": "#/$defs/Lease"},
+              "progress": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          }
+        },
+        "free": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/Kind"},
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "Offer": {
+      "type": "object",
+      "required": ["task", "kind", "class", "model", "size"],
+      "properties": {
+        "task": {"$ref": "#/$defs/TaskId"},
+        "kind": {"$ref": "#/$defs/Kind"},
+        "class": {"$ref": "#/$defs/Class"},
+        "model": {"$ref": "#/$defs/Model"},
+        "voice": {"$ref": "#/$defs/VoiceId"},
+        "lang": {"$ref": "#/$defs/Lang"},
+        "size": {
+          "type": "object",
+          "properties": {
+            "chars": {"type": "integer", "minimum": 0},
+            "input_tokens": {"type": "integer", "minimum": 0},
+            "max_tokens": {"type": "integer", "minimum": 0},
+            "seconds": {"type": "number", "minimum": 0}
+          }
+        },
+        "claim_in": {"$ref": "#/$defs/Seconds"},
+        "due_in": {"$ref": "#/$defs/Seconds"}
+      }
+    },
+    "PollResponse": {
+      "type": "object",
+      "required": ["now", "offers", "cancel", "retry_after"],
+      "properties": {
+        "now": {"type": "integer", "minimum": 0},
+        "offers": {"type": "array", "items": {"$ref": "#/$defs/Offer"}, "maxItems": 10},
+        "cancel": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["task", "lease"],
+            "properties": {"task": {"$ref": "#/$defs/TaskId"}, "lease": {"$ref": "#/$defs/Lease"}}
+          }
+        },
+        "need_caps": {"type": "boolean"},
+        "retry_after": {"type": "integer", "minimum": 1, "maximum": 60}
+      }
+    },
+
+    "ClaimRequest": {
+      "type": "object",
+      "required": ["lease"],
+      "properties": {"lease": {"$ref": "#/$defs/Lease"}}
+    },
+    "TtsInput": {
+      "type": "object",
+      "required": ["text", "lang", "voice", "model", "seed"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "lang": {"$ref": "#/$defs/Lang"},
+        "voice": {"$ref": "#/$defs/VoiceId"},
+        "model": {"$ref": "#/$defs/Model"},
+        "instruct": {"type": "string", "maxLength": 2000},
+        "temperature": {"type": "number", "minimum": 0.1, "maximum": 1.2},
+        "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    },
+    "Message": {
+      "type": "object",
+      "required": ["role", "content"],
+      "properties": {
+        "role": {"enum": ["user", "assistant"]},
+        "content": {"type": "string"}
+      }
+    },
+    "TextInput": {
+      "type": "object",
+      "required": ["model", "messages", "max_tokens"],
+      "properties": {
+        "model": {"$ref": "#/$defs/Model"},
+        "system": {"type": "string"},
+        "messages": {"type": "array", "items": {"$ref": "#/$defs/Message"}, "minItems": 1, "maxItems": 100},
+        "json_schema": {"type": "object"},
+        "max_tokens": {"type": "integer", "minimum": 1, "maximum": 65536},
+        "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+        "top_p": {"type": "number", "minimum": 0, "maximum": 1},
+        "top_k": {"type": "integer", "minimum": 1}
+      }
+    },
+    "ClaimResponse": {
+      "type": "object",
+      "required": ["task"],
+      "properties": {
+        "task": {
+          "type": "object",
+          "required": ["id", "kind", "class", "lease_in", "input"],
+          "properties": {
+            "id": {"$ref": "#/$defs/TaskId"},
+            "kind": {"$ref": "#/$defs/Kind"},
+            "class": {"$ref": "#/$defs/Class"},
+            "lease_in": {"$ref": "#/$defs/Seconds"},
+            "claim_in": {"$ref": "#/$defs/Seconds"},
+            "due_in": {"$ref": "#/$defs/Seconds"},
+            "input": {"type": "object"}
+          },
+          "allOf": [
+            {"if": {"properties": {"kind": {"const": "tts"}}}, "then": {"properties": {"input": {"$ref": "#/$defs/TtsInput"}}}},
+            {"if": {"properties": {"kind": {"const": "text"}}}, "then": {"properties": {"input": {"$ref": "#/$defs/TextInput"}}}}
+          ]
+        }
+      }
+    },
+
+    "TtsResultFields": {
+      "description": "The form fields of a speech result; the MP3 itself is the file field `audio` (audio/mpeg).",
+      "type": "object",
+      "required": ["lease", "ms"],
+      "properties": {
+        "lease": {"$ref": "#/$defs/Lease"},
+        "ms": {"type": "string", "pattern": "^[0-9]{1,9}$"}
+      }
+    },
+    "TextResult": {
+      "type": "object",
+      "required": ["lease", "output"],
+      "properties": {
+        "lease": {"$ref": "#/$defs/Lease"},
+        "output": {
+          "type": "object",
+          "required": ["content", "finish", "usage"],
+          "properties": {
+            "content": {"type": "string"},
+            "finish": {"enum": ["stop", "length"]},
+            "usage": {
+              "type": "object",
+              "required": ["input_tokens", "output_tokens"],
+              "properties": {
+                "input_tokens": {"type": "integer", "minimum": 0},
+                "output_tokens": {"type": "integer", "minimum": 0}
+              }
+            },
+            "timings": {
+              "type": "object",
+              "properties": {
+                "load_ms": {"type": "integer", "minimum": 0},
+                "read_ms": {"type": "integer", "minimum": 0},
+                "write_ms": {"type": "integer", "minimum": 0}
+              }
+            }
+          }
+        }
+      }
+    },
+    "ResultResponse": {
+      "oneOf": [
+        {"type": "object", "required": ["ok"], "properties": {"ok": {"const": true}}},
+        {"type": "object", "required": ["ok", "retake"], "properties": {"ok": {"const": false}, "retake": {"const": true}}}
+      ]
+    },
+
+    "FailRequest": {
+      "type": "object",
+      "required": ["lease", "reason", "retry"],
+      "properties": {
+        "lease": {"$ref": "#/$defs/Lease"},
+        "reason": {"enum": ["shutdown", "cancelled", "invalid", "too_large", "engine", "timeout"]},
+        "retry": {"type": "boolean"},
+        "error": {"type": "string", "maxLength": 200}
+      }
+    },
+    "FailResponse": {
+      "type": "object",
+      "required": ["ok"],
+      "properties": {"ok": {"const": true}}
+    },
+
+    "Error": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {"type": "string", "pattern": "^[a-z_]{2,40}$"},
+        "retry_after": {"type": "integer", "minimum": 1},
+        "supported": {
+          "type": "object",
+          "properties": {
+            "protocol": {"type": "array", "items": {"type": "integer"}},
+            "kinds": {"$ref": "#/$defs/KindVersions"}
+          }
+        }
+      }
+    }
+  }
+}

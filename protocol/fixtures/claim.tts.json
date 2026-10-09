@@ -1,0 +1,30 @@
+{
+  "call": "claim",
+  "task": 52,
+  "about": "A live speech task taken: the full input, the lease's time and when it is due.",
+  "request": {
+    "lease": "4d8f0b2e-7c1a-4b5e-9f3d-2a6c8e1b0d47"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "task": {
+        "id": 52,
+        "kind": "tts",
+        "class": "live",
+        "lease_in": 45,
+        "claim_in": 140,
+        "due_in": 170,
+        "input": {
+          "text": "Guten Abend und willkommen zurück. Gleich hört ihr ein Lied über Hoffnung.",
+          "lang": "de",
+          "voice": "Sohee",
+          "model": "qwen3-tts-1.7b",
+          "instruct": "Warm and calm, unhurried.",
+          "temperature": 0.7,
+          "seed": 0
+        }
+      }
+    }
+  }
+}

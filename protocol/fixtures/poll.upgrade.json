@@ -1,0 +1,38 @@
+{
+  "call": "poll",
+  "about": "A worker speaking a protocol the project does not.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.2.0",
+    "kinds": {
+      "tts": [
+        7
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "f60961eb3746b36526d097df3f2acbaef6cf986c83ede15a618997f4aa4fec98",
+    "running": [],
+    "free": {
+      "tts": 1
+    }
+  },
+  "response": {
+    "status": 426,
+    "body": {
+      "error": "upgrade_required",
+      "supported": {
+        "protocol": [
+          2
+        ],
+        "kinds": {
+          "tts": [
+            1
+          ],
+          "text": [
+            1
+          ]
+        }
+      }
+    }
+  }
+}

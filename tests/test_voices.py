@@ -3,8 +3,8 @@
 import logging
 import wave
 
-from arche_worker.engine import LANGUAGES, VOICES
-from arche_worker.voices import discover
+from herde.engines.tts.core import LANGUAGES, VOICES
+from herde.engines.tts.voices import discover
 
 WORDS = "Das war Mein Gott ist größer. Schön, dass ihr dabei seid."
 
