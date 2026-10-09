@@ -146,3 +146,14 @@ def test_the_path_from_the_environment(monkeypatch, tmp_path):
     assert config_path(str(tmp_path / "x.toml")) == tmp_path / "x.toml"
     monkeypatch.delenv("HERDE_CONFIG")
     assert config_path() == Path(os.path.expanduser("~/.config/herde/config.toml"))
+
+
+@pytest.mark.parametrize("name", ["config.example.toml", "docker/config.example.toml"])
+def test_the_example_configs_read(name, no_env):
+    import tomllib
+
+    from conftest import ROOT
+
+    data = tomllib.loads((ROOT / name).read_text(encoding="utf-8"))
+    config = parse(data)
+    assert config.projects == ()

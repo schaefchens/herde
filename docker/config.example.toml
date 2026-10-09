@@ -1,0 +1,21 @@
+# herde in Docker. `docker compose run --rm herde join <url> <code>` writes a first config/config.toml;
+# this one shows what else there is. Every setting: ../config.example.toml.
+name = "peters-pc"
+# Inside the container; compose publishes the page on 127.0.0.1 only.
+ui_host = "0.0.0.0"
+# When this computer works for others; nothing here means always.
+# windows = ["Mon-Fri 18:00-08:00", "Sat-Sun"]
+
+[tts]
+# "torch" in the cuda image (an NVIDIA GPU with 8 GB or more); "" for none.
+backend = "torch"
+# device = "cuda:0"
+
+[text]
+ollama = "http://ollama:11434"
+keep_alive = "60m"
+# Pull a model first: docker compose exec ollama ollama pull qwen3.6:35b
+# [[text.models]]
+# name = "qwen3.6-35b"
+# tag = "qwen3.6:35b"
+# context = 16384

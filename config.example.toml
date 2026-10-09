@@ -1,39 +1,75 @@
-# ARCHE voice worker. Copy to ~/.config/arche-worker/config.toml and run: chmod 600 on it.
-# The keys are secrets: with one, anyone could fetch what listeners sent to the station.
+# herde worker: every setting, with its default. Copy to ~/.config/herde/config.toml (in Docker:
+# docker/config/config.toml) and run: chmod 600 on it — or let `herde join <url> <code>` write a first one.
 
-# How this Mac shows up in /mod › KI-Moderation › Rechner (default: the Mac's name).
-# name = "Studio-Mac"
+# How this computer shows up to its projects (default: its host name).
+# name = "studio-mac"
 
 # MP3 for listeners on their phones; 96k mono is plenty for speech.
 mp3_bitrate = "96k"
-# Keep the Mac from idle sleep while the worker runs (macOS caffeinate).
+# Keep a Mac from idle sleep while the worker runs (caffeinate).
 keep_awake = true
+# Tasks at once on the GPU, across speech and text. 1 on a Mac: Gemma writing while Qwen spoke made
+# both two to five times slower. A large NVIDIA card may take 2.
+gpu_slots = 1
+# The status page with a Pause button, on this computer only (0: none). In Docker ui_host is 0.0.0.0
+# inside the container; compose publishes the port on 127.0.0.1 only.
+ui_port = 8737
+# ui_host = "127.0.0.1"
+# Where keys/, the pause, the measured speeds and the status live (default: next to this file).
+# state_dir = "~/.config/herde"
+
+# When this computer works for others, in its own time; nothing means always. A span across
+# midnight belongs to the day it starts on. Running work finishes; nothing new is taken outside.
+# windows = ["Mon-Fri 18:00-08:00", "Sat-Sun"]
+
+[limits]
+# The most a task may ask of this computer; larger ones are left to other workers.
+tts_chars = 2000
+text_input_chars = 200000
+text_max_tokens = 4096
+
+[tts]
+# mlx (a Mac), torch (NVIDIA, the cuda image), stub (silence, for tests), or "" for no speech.
+backend = ""
+# The checkpoints; the defaults suit the backend (mlx: mlx-community's bf16, pinned; torch: Qwen's).
+# model = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
+# revision = "52f4770fd9726457eae3d3b6aa92047a25a10776"
+# clone_model = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
+# clone_revision = "a6eb4f68e4b056f1215157bb696209bc82a6db48"
+# Reuse a download that is already there, e.g. the qwen3-tts-ui demo's:
+# hf_home = "~/Projects/schaefchens/qwen3-tts-ui/.runtime/huggingface"
+# Voices of your own (README: "Voices of your own"): <Name>.<lang>.wav and .txt in this folder.
+# voices = "~/.config/herde/voices"
+# Characters per take: each piece of a text is spoken on its own. `herde lab` compares sizes by ear.
+chunk_chars = 300
+# torch only: which GPU.
+# device = "cuda:0"
 # A take may run this many times its expected length (plus 30 s) before it is given back.
 task_timeout_factor = 4.0
 
-[engine]
-model = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
-revision = "52f4770fd9726457eae3d3b6aa92047a25a10776"
-# Reuse a download that is already there (about 4.2 GB), for example the qwen3-tts-ui demo's:
-# hf_home = "~/Projects/schaefchens/qwen3-tts-ui/.runtime/huggingface"
-# Characters per take: each piece of a text is spoken on its own (its delivery starts afresh).
-# 300 is the demo's; `run-arche-worker.sh lab` compares sizes by ear (README).
-# chunk_chars = 300
+[text]
+# ollama, stub, or "" for no text. With [[text.models]] it is ollama.
+# backend = "ollama"
+ollama = "http://127.0.0.1:11434"
+# How long Ollama keeps a model in memory after a task (a cold start of a large model takes 15 s or more).
+keep_alive = "60m"
 
-# Voices of our own (README: "Voices of your own"): <Name>.<lang>.wav and <Name>.<lang>.txt
-# in this folder, cloned by Qwen's Base model. Without any, Base is never loaded.
-# [clone]
-# voices = "~/.config/arche-worker/voices"
-# model = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
-# revision = "a6eb4f68e4b056f1215157bb696209bc82a6db48"
+# The models this computer offers: the name projects ask for (the same on every worker) and Ollama's
+# tag here. herde never pulls a model; pull it first (ollama pull gemma4:31b-mlx).
+# [[text.models]]
+# name = "gemma4-31b"
+# tag = "gemma4:31b-mlx"
+# context = 32768
 
-# One block per station, the most important first: the worker asks them in this order.
-[[stations]]
-name = "production"
-url = "https://radio.schaefchens.de"
-key = "paste the key from /mod here"
-
-# [[stations]]
-# name = "dev"
-# url = "http://localhost:8080"
-# key = "paste the dev station's key here"
+# One block per project; `herde join` adds them. The key is in its own file, readable by you only.
+# [[projects]]
+# name = "arche"
+# url = "https://radio.schaefchens.de/api/worker/v2"
+# key_file = "keys/arche.key"
+# How much background work this project gets beside the others (live work always goes first).
+# weight = 1
+# What it may use here; default everything.
+# kinds = ["tts", "text"]
+# models = ["qwen3-tts-1.7b", "gemma4-31b"]
+# When this project gets work from this computer, within the hours above.
+# windows = ["Mon-Fri 18:00-08:00"]

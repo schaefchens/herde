@@ -1,0 +1,12 @@
+.git
+.venv
+.venv-test
+**/__pycache__
+.pytest_cache
+.ruff_cache
+docker/config
+docker/cache
+tests
+protocol
+macos
+*.mp3

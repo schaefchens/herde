@@ -18,7 +18,7 @@ mlx = ["mlx==0.32.3", "mlx-metal==0.32.3", "mlx-audio==0.5.8", "numpy==2.5.3", "
 # Qwen3-TTS on NVIDIA through the official package. torch comes from PyTorch's CUDA index
 # (docker/Dockerfile): from PyPI it would be another build.
 cuda = ["qwen-tts==0.1.1", "torch>=2.6", "numpy>=2"]
-dev = ["pytest>=8", "jsonschema>=4.23", "ruff>=0.15"]
+dev = ["pytest>=8", "jsonschema>=4.23", "ruff>=0.15", "numpy>=2"]
 
 [project.scripts]
 herde = "herde.cli:main"

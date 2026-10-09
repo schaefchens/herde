@@ -1,159 +1,141 @@
-# ARCHE voice worker
+# herde
 
-A small program for an Apple Silicon Mac that speaks for the station's AI
-hosts with Qwen3-TTS, an open speech model, on the Mac's own GPU. The Mac
-needs internet access but no public address: the worker asks the station for
-voice tasks every few seconds, speaks them, and uploads each clip as an MP3.
-One worker can serve several stations (production and dev), and several Macs
-can work for one station at the same time. When no worker is online, the
-hosts that use it fall back to the next host in their lineup.
+A worker that does AI work — speech and text, later transcription — for any
+project that speaks its protocol. It runs on your own computers and on those
+of people who lend theirs: a Mac, or a Linux or Windows PC with Docker. The
+worker always connects out to its projects, so it needs no public address and
+no open port; it works behind any firewall.
 
-## What you need
+There is no central server. Each project hosts its side of the protocol
+([protocol/PROTOCOL.md](protocol/PROTOCOL.md)) and holds its own queue; a
+worker serves every project in its config and picks the next task itself:
 
-- A Mac with Apple Silicon (M1 or newer). An M1 Max speaks about twice as
-  fast as real time: 10 seconds of speech take about 5 seconds.
-- About 5 GB of disk for the model (downloaded once), 4 GB more for voices of
-  your own.
-- Python 3.13 and ffmpeg: `brew install python@3.13 ffmpeg`.
+- **live** work first (a moment on air), the earliest due first; then
+  **interactive** (a person waits); then **background** work, in turns by the
+  weights you give the projects;
+- only what it can finish before it is due, by its own measured speed;
+- one task at a time on the GPU across speech and text (on a Mac both get two
+  to five times slower when they share it), unless you allow more;
+- it polls while it works: that keeps its tasks' leases alive, and a project
+  always knows it is there.
 
-## Set up
+ARCHE (a Christian community radio) is the first project: its PHP serves the
+protocol at `/api/worker/v2`.
 
-1. Install:
+## What runs where
 
-   ```
-   worker/setup-arche-worker.sh
-   ```
+| Computer | Speech (Qwen3-TTS 1.7B) | Text | How |
+|---|---|---|---|
+| Mac with Apple Silicon | mlx-audio on the GPU | Ollama (the app) | natively: Docker cannot reach a Mac's GPU |
+| Linux or Windows, NVIDIA (8 GB+) | the official `qwen-tts` on CUDA | Ollama container | Docker, `herde:cuda` |
+| Linux or Windows, CPU only | — | Ollama container (slow) | Docker, `herde:base` |
 
-   This creates `worker/.venv` and, if there is none yet, a config at
-   `~/.config/arche-worker/config.toml` (readable only by you).
+On Windows, Docker Desktop with WSL2 passes an NVIDIA GPU through; AMD and
+Intel GPUs are not supported in Docker there yet.
 
-2. In the station's /mod › KI-Moderation › Rechner, add a worker. /mod shows
-   its key once: copy it into the config's `[[stations]]` block, together
-   with the station's address.
+## Install on a Mac
 
-3. Check the config, ffmpeg and each station, without loading the model:
-
-   ```
-   worker/run-arche-worker.sh check
-   ```
-
-4. Start it:
-
-   ```
-   worker/run-arche-worker.sh
-   ```
-
-   The first start downloads the model (about 4.2 GB). If the qwen3-tts-ui
-   demo already downloaded it, point `hf_home` in the config's `[engine]` at
-   its `.runtime/huggingface` folder instead.
-
-Then, in /mod › KI-Moderation, give a host the voice "Eigener Rechner
-(Qwen)" and pick a voice per language (for German, Sohee). `worker/run-arche-worker.sh
-once` does a single task and stops, handy for a first try.
-
-## Several stations
-
-Add one `[[stations]]` block per station, the most important first; the
-worker asks them in that order and speaks one task at a time:
-
-```toml
-[[stations]]
-name = "production"
-url = "https://radio.schaefchens.de"
-key = "…"
-
-[[stations]]
-name = "dev"
-url = "http://localhost:8080"
-key = "…"
+```
+git clone git@github.com:schaefchens/herde.git && cd herde
+macos/install.sh
 ```
 
-Plain `http` is accepted only for this Mac itself (`localhost`).
+It makes `.venv` (Python 3.13 and the tested mlx-audio set), a config at
+`~/.config/herde/config.toml` (readable only by you) and a launchd job file,
+and prints how to start it. It can take over an `arche-worker` config: its
+stations become projects (at their `/api/worker/v2`), their keys key files,
+and its voices folder comes along. Then:
 
-## Start at login
+```
+.venv/bin/herde check        # the config, ffmpeg, Ollama, and each project's answer
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/de.schaefchens.herde.plist
+```
 
-1. Copy `launchd/de.schaefchens.arche-worker.plist` to
-   `~/Library/LaunchAgents/` and replace the `/Users/YOU/…` paths in it.
-2. Load it:
+The first start downloads the speech model (about 4.2 GB; 4 GB more for
+voices of your own). The log is `~/Library/Logs/herde.log`.
 
-   ```
-   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/de.schaefchens.arche-worker.plist
-   ```
+## Install with Docker (Linux, Windows)
 
-3. Restart it after a change with
-   `launchctl kickstart -k gui/$(id -u)/de.schaefchens.arche-worker`, stop it with
-   `launchctl bootout gui/$(id -u)/de.schaefchens.arche-worker`.
+```
+cd docker
+mkdir -p config cache
+docker compose run --rm herde join https://radio.example.org/api/worker/v2 7KQ3-M2XP-…
+docker compose -f compose.yaml -f compose.nvidia.yaml up -d      # with an NVIDIA GPU
+docker compose up -d                                           # without: text only
+```
 
-The log is in `~/Library/Logs/arche-worker.log`. With `keep_awake = true` the
-worker keeps the Mac from going to sleep while it runs; a closed lid on
-battery still sends it to sleep, and the hosts then fall back to other voices.
+`join` writes `config/config.toml` and the project's key into `config/keys/`.
+On Linux the container runs as your user (put `HERDE_UID` and `HERDE_GID` into
+`.env` if yours is not 1000). Text models come from the Ollama container:
+`docker compose exec ollama ollama pull qwen3.6:35b`, then list it in the
+config (`[[text.models]]`, see `docker/config.example.toml`).
 
-## Listening test (lab)
+The container runs as a plain user on a read-only file system, with no
+capabilities; the key stays in a file in `config/`, never in an environment
+variable.
 
-How a moment sounds depends on how its text is cut into takes (each piece is
-spoken on its own, and its delivery starts afresh) and on the temperature.
-The lab speaks the same words in several ways for you to compare by ear:
+## Joining, pausing, hours
 
-1. On the station's side, write a cases file from a real stretch of the
-   program (`server/bin/replay-show.php`: each host moment as it aired and as
-   it is written now, with the voice direction each gets):
+- **Join** with the invite a project's admin made (shown once, valid for a
+  few days): `herde join <url> <code>`. Joining again with a new code renews
+  the key.
+- **Pause** when you need the computer: `herde pause 2h`, `herde pause until
+  18:00`, `herde pause` (until `herde resume`). Running work finishes first.
+  The status page has the same buttons: <http://127.0.0.1:8737>.
+- **Hours**: `windows = ["Mon-Fri 18:00-08:00", "Sat-Sun"]` in the config, for
+  all projects or one. Outside them the worker takes nothing new and tells its
+  projects when it is back.
+- `herde status` shows what it does now.
 
-   ```
-   docker compose --env-file docker/compose.env run --rm --no-deps -v "$PWD/.data/replay:/out" php \
-     php /srv/server/bin/replay-show.php --from=2026-10-07T14:00 --to=2026-10-07T18:00 --out=/out
-   ```
+Every setting is in [config.example.toml](config.example.toml).
 
-2. Speak it on this Mac:
+## Speech
 
-   ```
-   worker/run-arche-worker.sh lab .data/replay/cases.json --chunks 300,whole,sentence --temperatures 0.7
-   ```
+Qwen's nine presets speak ten languages and take a spoken direction
+(`instruct`). A voice of your own is cloned from a recording by Qwen's Base
+model: put `<Name>.<lang>.wav` (3–30 s, PCM) and `<Name>.<lang>.txt` (exactly
+what it says) into the voices folder, and restart. It is offered in the
+languages it has recordings for, and takes no direction — its words and its
+recording carry the feeling. A recording of a real person only with their
+consent.
 
-   `--chunks`: a size in characters (300 is today's), `whole` (a moment in
-   one take) or `sentence` (one take per sentence); `--only 1643` speaks only
-   the cases whose id contains it. The clips land in `~/arche-lab/<date-time>/`;
-   open its `index.html` to listen side by side. A running worker shares the
-   GPU meanwhile, so its tasks take longer.
+`herde lab cases.json` speaks the same words in several ways (how a text is
+cut into takes, the temperature) for you to compare by ear; ARCHE's
+`bin/replay-show.php` writes such a file. `herde bench` measures this
+computer's speed with the real models, so the scheduler's first estimates fit.
 
-3. Put what sounds best into the config's `[engine]` block, for example
-   `chunk_chars = 1100`, and restart the worker.
+## Text
 
-## Voices of your own
+Through Ollama: a model is offered under the name projects ask for, mapped to
+Ollama's tag on this computer (`gemma4-31b` → `gemma4:31b-mlx` on a Mac,
+`gemma4:31b` elsewhere). herde never pulls a model — a project could otherwise
+fill your disk. Answers follow the task's JSON schema, thinking is off, and a
+model that writes only blank space is stopped early.
 
-Qwen's nine presets are fixed voices. A voice of your own is cloned from a
-recording by Qwen's Base model (about 4 GB more on disk and in memory, loaded
-only when there is one):
+## Privacy and safety
 
-1. Put two files per language into `~/.config/arche-worker/voices/` (next to
-   the config; `[clone] voices` names another folder), for example
-   `Faith.de.wav`, a recording of 3 to 30 seconds (PCM WAV), and
-   `Faith.de.txt`, exactly what it says. A language without a recording
-   borrows another one's: Qwen carries a voice across languages, with an
-   accent.
-2. Restart the worker. `run-arche-worker.sh check` lists the voices it found;
-   the log says why a file was left out (a name like a preset's, no words, too
-   short or too long).
-3. In /mod › KI-Moderation, pick "Faith (own voice: de, en)" for the host in
-   each language, as you would a preset. Only computers that have the voice
-   offer it: copy its files to every Mac that should speak it.
+- A project decides what each worker may see: work with people's words goes
+  only to computers it trusts as its own; a lent computer gets public work.
+- The worker keeps a task's input and output only while it works on it and
+  never writes them to its log. Keys live in files readable only by you.
+- It follows no URL a task names, downloads nothing a task names, gives text
+  models no tools, and checks every id against the protocol's patterns.
+- Keep a Mac's disk encrypted (FileVault). If a key gets out, the project's
+  admin issues a new one.
 
-The clone speaks every take in that voice, the same woman each time, but it
-takes no direction: neither the host's voice direction nor a moment's
-delivery reaches it. Its words, and how the recording sounds, carry the
-feeling, so the recording should already be in the host's tone. Faith's comes
-from Qwen's VoiceDesign, a voice made from a description; on its own,
-VoiceDesign made a slightly different woman in each take. A recording of a
-real person only with their consent.
+## For a project
 
-## Privacy
-
-The texts the worker speaks include what listeners sent: their first names,
-places and prayer requests. They stay on this Mac only as long as a take
-lasts and are never written to the log. Keep the Mac's disk encrypted
-(FileVault), and never share the config or a key. If a key gets out, issue a
-new one in /mod › KI-Moderation › Rechner.
+Implement [protocol/PROTOCOL.md](protocol/PROTOCOL.md): five calls, JSON over
+HTTPS, the key in `X-Worker-Key`. [protocol/schema.json](protocol/schema.json)
+describes every message and [protocol/fixtures](protocol/fixtures) holds an
+example of every exchange — test your side against them. ARCHE's PHP
+(`server/app/Workers/`) is a working implementation on shared hosting.
 
 ## Tests
 
-`npm run test:worker` (or `worker/test.sh`) runs the worker's tests. They
-need neither the model nor a GPU.
+`./test.sh` runs ruff and the tests: no model, no GPU, no network. The
+image against a fake project, end to end:
+
+```
+docker compose -f tests/integration/compose.yaml up --build --exit-code-from project
+```

@@ -1,0 +1,53 @@
+# The herde image against a fake project, end to end (no model: the stub engines):
+#   docker compose -f tests/integration/compose.yaml up --build --exit-code-from project
+name: herde-integration
+
+services:
+  project:
+    image: python:3.12-slim-bookworm
+    command: ["python", "/fake_project.py"]
+    volumes:
+      - ./fake_project.py:/fake_project.py:ro
+
+  herde:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      target: base
+    image: herde:base
+    read_only: true
+    tmpfs:
+      - /tmp
+      # Owned by the image's user, as a mounted folder would be.
+      - /config:uid=10001,gid=10001,mode=0700
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      HERDE_CONFIG: /config/config.toml
+    # The config and key are written into the tmpfs first: the image itself stays read-only.
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        umask 077
+        mkdir -p /config/keys
+        printf '%s' "integration-kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk" > /config/keys/project.key
+        cat > /config/config.toml <<'TOML'
+        name = "integration"
+        ui_port = 0
+        [tts]
+        backend = "stub"
+        [text]
+        backend = "stub"
+        [[text.models]]
+        name = "stub"
+        tag = "stub"
+        [[projects]]
+        name = "project"
+        url = "http://project:8000/api/worker/v2"
+        key_file = "keys/project.key"
+        TOML
+        exec herde run
+    depends_on:
+      - project

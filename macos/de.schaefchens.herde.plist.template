@@ -1,37 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Starts the ARCHE voice worker at login and again if it stops.
-  Replace /Users/YOU/Projects/schaefchens/radio-app with this checkout's path (twice) and
-  YOU in the log paths, then: see worker/README.md, "Start at login".
+  Starts herde at login and again if it stops. macos/install.sh fills in the paths:
+  __HERDE__ (the venv's herde), __REPO__, __CONFIG__ and __LOG__.
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>de.schaefchens.arche-worker</string>
+    <string>de.schaefchens.herde</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/YOU/Projects/schaefchens/radio-app/worker/run-arche-worker.sh</string>
+        <string>__HERDE__</string>
+        <string>--config</string>
+        <string>__CONFIG__</string>
         <string>run</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/YOU/Projects/schaefchens/radio-app/worker</string>
+    <string>__REPO__</string>
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- launchd's PATH lacks Homebrew, where python3.13 and ffmpeg live. -->
+        <!-- launchd's PATH lacks Homebrew, where ffmpeg lives (and Ollama's command, for `herde check`). -->
         <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <!-- SIGTERM first: running tasks are given back to their projects before it stops. -->
+    <key>ExitTimeOut</key>
+    <integer>30</integer>
     <!-- Not throttled like a background job: a take must be ready before its moment airs. -->
     <key>ProcessType</key>
     <string>Interactive</string>
     <key>StandardOutPath</key>
-    <string>/Users/YOU/Library/Logs/arche-worker.log</string>
+    <string>__LOG__</string>
     <key>StandardErrorPath</key>
-    <string>/Users/YOU/Library/Logs/arche-worker.log</string>
+    <string>__LOG__</string>
 </dict>
 </plist>

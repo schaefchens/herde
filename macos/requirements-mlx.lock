@@ -1,5 +1,6 @@
-# Qwen3-TTS through mlx-audio, pinned to the versions the qwen3-tts-ui demo runs
-# on an M1 Max (its requirements.lock.txt, without its web server's packages).
+# Qwen3-TTS through mlx-audio on a Mac, pinned to the versions the qwen3-tts-ui demo
+# runs on an M1 Max (its requirements.lock.txt, without its web server's packages).
+# macos/install.sh installs these, then herde itself with --no-deps.
 annotated-doc==0.0.5
 anyio==4.15.1
 certifi==2026.7.22

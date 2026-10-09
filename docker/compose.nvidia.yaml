@@ -1,0 +1,23 @@
+# With an NVIDIA GPU (Linux with the NVIDIA Container Toolkit, or Windows with Docker Desktop and WSL2):
+#   docker compose -f compose.yaml -f compose.nvidia.yaml up -d
+services:
+  herde:
+    build:
+      target: cuda
+    image: herde:cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

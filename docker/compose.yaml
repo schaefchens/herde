@@ -1,0 +1,52 @@
+# herde in Docker: the worker, and Ollama beside it for text.
+#
+#   mkdir -p config cache                          (before the first start: Docker would make them root's)
+#   docker compose run --rm herde join <url> <code>  (the invite from the project's admin)
+#   docker compose up -d                            (CPU: text only, slowly)
+#   docker compose -f compose.yaml -f compose.nvidia.yaml up -d   (an NVIDIA GPU: speech and text)
+#
+# On Linux, the worker runs as your user so it can write ./config and ./cache:
+# put HERDE_UID=$(id -u) and HERDE_GID=$(id -g) into .env when yours is not 1000.
+# The status page: http://127.0.0.1:8737 (this computer only).
+name: herde
+
+services:
+  herde:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: base
+    image: herde:base
+    restart: unless-stopped
+    user: "${HERDE_UID:-1000}:${HERDE_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      # config.toml, keys/ (written by join), voices/, and the worker's state.
+      - ./config:/config
+      # Model downloads (several GB): kept across updates.
+      - ./cache:/cache
+    ports:
+      - "127.0.0.1:8737:8737"
+    depends_on:
+      - ollama
+    # Running tasks are given back to their projects before it stops.
+    stop_grace_period: 30s
+
+  ollama:
+    image: ollama/ollama:0.40.2
+    restart: unless-stopped
+    # Not published: only herde talks to it, on this compose network.
+    environment:
+      OLLAMA_KEEP_ALIVE: 60m
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama:

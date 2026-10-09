@@ -185,7 +185,7 @@ class Worker:
     async def _load_tts(self) -> None:
         self.loading.add("tts")
         started = self.clock()
-        log.info("Loading speech (%s; the first time a download of several GB)", self.tts.backend.name)
+        log.info("Loading speech (%s%s)", self.tts.backend.name, "" if self.tts.backend.name == "stub" else "; the first time a download of several GB")
         try:
             await asyncio.to_thread(self.tts.load)
         except Exception as e:  # without speech, text may still be served
