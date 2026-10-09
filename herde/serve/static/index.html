@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>herde serve</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>herde <span id="name"></span></h1>
+  <p class="muted">A little project of your own: invite your workers, give them jobs, hear and read what they make.</p>
+</header>
+
+<p id="locked" class="notice" hidden>Open the address <code>herde serve</code> printed when it started: it ends in <code>#token=…</code>.</p>
+
+<main id="main" hidden>
+  <section>
+    <h2>Workers</h2>
+    <div class="scroll"><table id="workers"></table></div>
+    <p id="no-workers" class="muted" hidden>No worker yet: invite one, then run the command on that computer.</p>
+    <form id="invite-form" class="row">
+      <input name="name" maxlength="60" placeholder="Name of the computer, e.g. Studio Mac" aria-label="Name of the computer">
+      <button>Invite a worker</button>
+    </form>
+    <div id="invite-box" class="card" hidden>
+      <p><strong id="invite-title"></strong> — this code works once, for three days:</p>
+      <p class="code" id="invite-code"></p>
+      <p>On that computer, with herde installed:</p>
+      <pre id="invite-join"></pre>
+      <p class="muted">A worker on another computer needs an https address for this project: put a reverse proxy in front
+        (for example Caddy) and start <code>herde serve --public-url https://…</code>.</p>
+      <button type="button" id="invite-done">Done</button>
+    </div>
+    <ul id="invites" class="plain"></ul>
+  </section>
+
+  <section>
+    <h2>New job</h2>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="tts" aria-selected="true">Speech</button>
+      <button type="button" role="tab" data-tab="text" aria-selected="false">Text</button>
+    </div>
+    <form id="tts-form">
+      <label>Words<textarea name="text" rows="3" maxlength="2000" required>Hello, this is herde, speaking on a computer of your own.</textarea></label>
+      <div class="row">
+        <label>Voice<select name="voice"></select></label>
+        <label>Language<select name="lang"></select></label>
+        <label>Temperature<input name="temperature" type="number" min="0.1" max="1.2" step="0.1" value="0.7"></label>
+      </div>
+      <label>How it should sound <span class="muted">(optional; a cloned voice ignores it)</span><input name="instruct" maxlength="1000" placeholder="Warm and calm."></label>
+      <div class="row"><button>Speak</button><span id="tts-hint" class="muted"></span></div>
+    </form>
+    <form id="text-form" hidden>
+      <label>Model<select name="model"></select></label>
+      <label>System <span class="muted">(optional)</span><textarea name="system" rows="2"></textarea></label>
+      <label>Prompt<textarea name="prompt" rows="4" required>Say hello in German and in English.</textarea></label>
+      <label>JSON schema <span class="muted">(optional: the answer must follow it)</span><textarea name="schema" rows="3" placeholder='{"type": "object", "properties": {"de": {"type": "string"}, "en": {"type": "string"}}, "required": ["de", "en"]}'></textarea></label>
+      <div class="row"><label>Max tokens<input name="max_tokens" type="number" min="1" max="8192" value="512"></label></div>
+      <div class="row"><button>Ask</button><span id="text-hint" class="muted"></span></div>
+    </form>
+    <p id="job-error" class="error" hidden></p>
+  </section>
+
+  <section>
+    <h2>Jobs</h2>
+    <p id="no-jobs" class="muted" hidden>None yet.</p>
+    <ul id="jobs" class="plain"></ul>
+  </section>
+</main>
+
+<footer class="muted">herde · Apache License 2.0 · <a href="https://github.com/schaefchens/herde" rel="noreferrer">github.com/schaefchens/herde</a></footer>
+</body>
+</html>

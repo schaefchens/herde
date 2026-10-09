@@ -33,6 +33,7 @@ from .engines.tts.mp3 import EncodeError, encode, find_ffmpeg
 from .estimates import Speeds
 from .machine import platform_info
 from .protocol import KIND_VERSIONS, poll_body
+from .serve import DEFAULT_PORT, default_data, serve_command
 from .state import PauseError, State, parse_pause
 from .worker import Link, Worker
 
@@ -66,9 +67,17 @@ def main(argv: list[str] | None = None) -> int:
     lab_p.add_argument("--only", default="", help="only the cases whose id contains this")
     imp = sub.add_parser("import-arche-worker", help="take over an arche-worker config: its keys, voices and speech settings")
     imp.add_argument("old", nargs="?", default=str(Path.home() / ".config" / "arche-worker" / "config.toml"))
+    sv = sub.add_parser("serve", help="a little project of your own: invite workers, give them jobs, hear and read what they make")
+    sv.add_argument("--host", default=os.environ.get("HERDE_SERVE_HOST", "127.0.0.1"), help="where the page listens (default: this computer only)")
+    sv.add_argument("--port", type=int, default=DEFAULT_PORT)
+    sv.add_argument("--data", help="its database and clips (default ~/.local/share/herde-serve, or $HERDE_SERVE_DATA)")
+    sv.add_argument("--name", default="herde serve", help="how the project names itself to its workers")
+    sv.add_argument("--public-url", default="", help="the https address workers on other computers reach it at (behind a reverse proxy)")
     args = parser.parse_args(argv)
     _logging(args.verbose)
     command = args.command or "run"
+    if command == "serve":
+        return serve_command(args.host, args.port, Path(args.data).expanduser() if args.data else default_data(), args.name, args.public_url)
     path = config_path(args.config)
 
     if command == "join":

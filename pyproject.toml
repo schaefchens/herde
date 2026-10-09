@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "herde"
-version = "0.2.0"
+version = "0.3.0"
 description = "A worker that does AI work — speech, text — for projects that host the herde protocol; it connects out, so it works behind any firewall."
 readme = "README.md"
 license = "Apache-2.0"
@@ -27,6 +27,10 @@ herde = "herde.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["herde*"]
+
+[tool.setuptools.package-data]
+# herde serve's page.
+"herde.serve" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

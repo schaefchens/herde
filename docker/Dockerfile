@@ -18,6 +18,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HERDE_CONTAINER=1 \
     HERDE_CONFIG=/config/config.toml \
+    HERDE_SERVE_DATA=/data \
+    HERDE_SERVE_HOST=0.0.0.0 \
     HERDE_UI_HOST=0.0.0.0 \
     HERDE_OLLAMA=http://ollama:11434 \
     HOME=/tmp \
@@ -27,8 +29,8 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --uid 10001 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin herde \
- && mkdir -p /config /cache \
- && chown herde:herde /config /cache
+ && mkdir -p /config /cache /data \
+ && chown herde:herde /config /cache /data
 WORKDIR /opt/herde
 COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY herde ./herde
@@ -48,6 +50,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     HERDE_CONTAINER=1 \
     HERDE_CONFIG=/config/config.toml \
+    HERDE_SERVE_DATA=/data \
+    HERDE_SERVE_HOST=0.0.0.0 \
     HERDE_UI_HOST=0.0.0.0 \
     HERDE_OLLAMA=http://ollama:11434 \
     HERDE_TTS_BACKEND=torch \
@@ -64,8 +68,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m venv /opt/venv \
  && useradd --uid 10001 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin herde \
- && mkdir -p /config /cache \
- && chown herde:herde /config /cache
+ && mkdir -p /config /cache /data \
+ && chown herde:herde /config /cache /data
 # torch from PyTorch's CUDA index first, so qwen-tts's requirements find it there.
 RUN pip install torch torchaudio --index-url ${TORCH_INDEX}
 WORKDIR /opt/herde

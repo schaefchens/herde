@@ -151,13 +151,54 @@ model that writes only blank space is stopped early.
 - Keep a Mac's disk encrypted (FileVault). If a key gets out, the project's
   admin issues a new one.
 
+## Try it: a little project of your own
+
+`herde serve` is a small project on your computer: a page where you invite
+workers, give them speech and text jobs, and hear or read what they made. It is
+the project side of the protocol, so a worker treats it like any project.
+
+```
+herde serve
+```
+
+It prints the page's address with its key (`http://127.0.0.1:8740/#token=…`);
+open it, invite a worker, run the `herde join …` command the page shows on that
+computer, and submit a job. Without a GPU, a worker with `[tts] backend =
+"stub"` and `[text] backend = "stub"` makes silent clips and fixed answers: the
+whole path, end to end. The page listens on this computer only; its database
+and clips live in `~/.local/share/herde-serve` (`--data`).
+
+In Docker, beside a worker:
+
+```
+docker run -d --name herde-serve -p 127.0.0.1:8740:8740 -v herde-serve:/data ghcr.io/schaefchens/herde:base serve
+docker logs herde-serve        (the page's address, with its key)
+```
+
+A worker on another computer needs an https address: put a reverse proxy
+(Caddy, nginx) in front and start `herde serve --public-url https://…`, so
+invites name that address.
+
+Scripts use the same API as the page, with the key in `X-Herde-Token`:
+
+| Call | |
+|---|---|
+| `POST /api/jobs` | `{"kind": "tts", "text", "voice", "lang", "instruct"?, "temperature"?}` or `{"kind": "text", "model", "prompt" or "messages", "system"?, "json_schema"?, "max_tokens"?}`, both with an optional `class` (`live`, `interactive`, `background`) and `due_in` (seconds) → `{"id"}` |
+| `GET /api/jobs/{id}` | its state, its worker, and for text the answer |
+| `GET /api/jobs/{id}/audio` | the MP3 of a speech job that is done |
+| `DELETE /api/jobs/{id}` | cancel (a worker holding it hears so with its next poll) |
+| `GET /api/state` | workers, open invites, the latest jobs |
+| `POST /api/invites` | `{"name"}` → a one-time code and the command to join with it |
+
 ## For a project
 
 Implement [protocol/PROTOCOL.md](protocol/PROTOCOL.md): five calls, JSON over
 HTTPS, the key in `X-Worker-Key`. [protocol/schema.json](protocol/schema.json)
 describes every message and [protocol/fixtures](protocol/fixtures) holds an
-example of every exchange — test your side against them. ARCHE's PHP
-(`server/app/Workers/`) is a working implementation on shared hosting.
+example of every exchange — test your side against them. Two working
+implementations: `herde serve` ([herde/serve/project.py](herde/serve/project.py),
+Python and SQLite, about 500 lines), and ARCHE's PHP (`server/app/Workers/` in
+its repo) on shared hosting.
 
 ## Tests
 
