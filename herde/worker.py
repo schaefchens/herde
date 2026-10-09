@@ -243,7 +243,9 @@ class Worker:
         else:
             state = "ready"
         kinds = self.kinds(link)
-        free = {k: (1 if state == "ready" and self.can_start(k) else 0) for k in kinds}
+        # Free only where an engine is ready: Ollama down, a model still loading, is no slot to offer into.
+        ready = {"tts": self.tts is not None and self.tts.ready, "text": self.text is not None and self.text.ready}
+        free = {k: (1 if state == "ready" and ready[k] and self.can_start(k) else 0) for k in kinds}
         running = [{"task": r.task.id, "lease": r.task.lease, "progress": round(r.progress, 2)} for r in link.running.values()]
         send_caps = link.need_caps or link.sent_hash != caps_hash(caps)
         return poll_body(state, caps, send_caps, running, free, kinds, f"herde/{VERSION}", resume_in if state == "paused" else None)
@@ -254,8 +256,12 @@ class Worker:
         while not self.stopping:
             wait = link.backoff_until - self.clock()
             if wait > 0:
+                # A task ending meanwhile changes nothing: the project is left alone until then.
+                link.poke.clear()
                 await self._nap(link, wait)
                 continue
+            # Cleared before the poll is made, not after: a task that ends while it is on its way is reported at once.
+            link.poke.clear()
             body = self.poll_body(link)
             try:
                 answer = await link.conn.poll(body, self.clock())
@@ -278,7 +284,6 @@ class Worker:
 
     async def _nap(self, link: Link, seconds: float) -> None:
         """Sleep until the next poll — or at once after a task ended (to report it and hear what is new)."""
-        link.poke.clear()
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(link.poke.wait(), timeout=max(0.0, seconds * self.scale))
 
