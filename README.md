@@ -36,7 +36,7 @@ Intel GPUs are not supported in Docker there yet.
 ## Install on a Mac
 
 ```
-git clone git@github.com:schaefchens/herde.git && cd herde
+git clone https://github.com/schaefchens/herde.git && cd herde
 macos/install.sh
 ```
 
@@ -56,9 +56,36 @@ voices of your own). The log is `~/Library/Logs/herde.log`.
 
 ## Install with Docker (Linux, Windows)
 
+The images are on GitHub's registry: `ghcr.io/schaefchens/herde:cuda` (speech
+and text, an NVIDIA GPU with 8 GB or more) and `:base` (text through Ollama, no
+speech). On Linux you need the NVIDIA Container Toolkit; on Windows, Docker
+Desktop with WSL2 and a current NVIDIA driver. Nothing to clone or build.
+
+**To lend your GPU to a project for speech** (what ARCHE asks for), two
+commands, each on one line (they work in a Linux shell and in PowerShell):
+
 ```
-cd docker
-mkdir -p config cache
+docker run --rm -v herde:/config ghcr.io/schaefchens/herde:cuda join <url> <code>
+docker run -d --name herde --restart unless-stopped --gpus all --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges -v herde:/config -v herde-cache:/cache -p 127.0.0.1:8737:8737 ghcr.io/schaefchens/herde:cuda
+```
+
+The first joins with the invite the project's admin gave you: it writes the
+config and the key into the volume `herde`. The second runs the worker, now
+and after every restart; the first start downloads the speech model (about
+4 GB) into `herde-cache`. Then:
+
+- the status page, with Pause and Resume: <http://127.0.0.1:8737>;
+- pause from a shell: `docker exec herde herde pause 2h`, resume: `docker exec herde herde resume`;
+- what it does: `docker logs -f herde`;
+- an update: `docker pull ghcr.io/schaefchens/herde:cuda`, `docker rm -f herde`, then the second command again;
+- to stop for good: `docker rm -f herde` (and `docker volume rm herde herde-cache` to forget the key and the model).
+
+**With Ollama for text too**, use the compose files in `docker/`:
+
+```
+mkdir herde && cd herde && mkdir config cache
+curl -fsSLO https://raw.githubusercontent.com/schaefchens/herde/main/docker/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/schaefchens/herde/main/docker/compose.nvidia.yaml
 docker compose run --rm herde join https://radio.example.org/api/worker/v2 7KQ3-M2XP-…
 docker compose -f compose.yaml -f compose.nvidia.yaml up -d      # with an NVIDIA GPU
 docker compose up -d                                           # without: text only
@@ -70,9 +97,10 @@ On Linux the container runs as your user (put `HERDE_UID` and `HERDE_GID` into
 `docker compose exec ollama ollama pull qwen3.6:35b`, then list it in the
 config (`[[text.models]]`, see `docker/config.example.toml`).
 
-The container runs as a plain user on a read-only file system, with no
-capabilities; the key stays in a file in `config/`, never in an environment
-variable.
+Either way the container runs as a plain user on a read-only file system, with
+no capabilities; the key stays in a file, never in an environment variable.
+To build an image yourself: `docker build -f docker/Dockerfile --target cuda -t
+ghcr.io/schaefchens/herde:cuda .` (compose then uses yours).
 
 ## Joining, pausing, hours
 
@@ -139,3 +167,12 @@ image against a fake project, end to end:
 ```
 docker compose -f tests/integration/compose.yaml up --build --exit-code-from project
 ```
+
+## License
+
+Apache License 2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)): use herde, change
+it, build on it and earn money with it — run it for others, sell a service or
+a product with it — as long as you keep the copyright notice and say what you
+changed. The license also grants the patents its contributors hold on their
+code. It grants no right to the name "herde" or to schaefchens' names and
+logos: a product of your own goes under a name of your own.

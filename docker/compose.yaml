@@ -1,4 +1,6 @@
-# herde in Docker: the worker, and Ollama beside it for text.
+# herde in Docker: the worker, and Ollama beside it for text. The images come from
+# ghcr.io/schaefchens/herde; to build one here instead (the same name, so compose uses it):
+#   docker build -f docker/Dockerfile --target cuda -t ghcr.io/schaefchens/herde:cuda .
 #
 #   mkdir -p config cache                          (before the first start: Docker would make them root's)
 #   docker compose run --rm herde join <url> <code>  (the invite from the project's admin)
@@ -12,11 +14,7 @@ name: herde
 
 services:
   herde:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: base
-    image: herde:base
+    image: ghcr.io/schaefchens/herde:base
     restart: unless-stopped
     user: "${HERDE_UID:-1000}:${HERDE_GID:-1000}"
     read_only: true

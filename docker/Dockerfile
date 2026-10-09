@@ -30,7 +30,7 @@ RUN apt-get update \
  && mkdir -p /config /cache \
  && chown herde:herde /config /cache
 WORKDIR /opt/herde
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY herde ./herde
 RUN pip install .
 USER herde
@@ -69,7 +69,7 @@ RUN apt-get update \
 # torch from PyTorch's CUDA index first, so qwen-tts's requirements find it there.
 RUN pip install torch torchaudio --index-url ${TORCH_INDEX}
 WORKDIR /opt/herde
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY herde ./herde
 RUN pip install ".[cuda]" --extra-index-url ${TORCH_INDEX}
 USER herde

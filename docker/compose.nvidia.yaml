@@ -2,9 +2,7 @@
 #   docker compose -f compose.yaml -f compose.nvidia.yaml up -d
 services:
   herde:
-    build:
-      target: cuda
-    image: herde:cuda
+    image: ghcr.io/schaefchens/herde:cuda
     deploy:
       resources:
         reservations:
