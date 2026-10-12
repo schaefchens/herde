@@ -1,0 +1,11 @@
+{
+  "call": "files",
+  "about": "A file that is none of this worker's profile's (a lender asking for a recording kept for our own computers).",
+  "request": {},
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "not_found"
+    }
+  }
+}

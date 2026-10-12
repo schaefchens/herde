@@ -11,16 +11,32 @@ RATE = 24000
 
 class StubBackend:
     name = "stub"
+    # No weights: no number format, no checkpoints.
+    dtype = ""
 
     def __init__(self) -> None:
         self._ready = False
+        self.learnt: list[Reference] = []
 
     @property
     def ready(self) -> bool:
         return self._ready
 
+    def pins(self) -> tuple[str, str]:
+        return "", ""
+
+    def checkpoints(self) -> tuple[str, str]:
+        return "", ""
+
     def load(self, refs: list[Reference]) -> None:
+        self.learnt = list(refs)
         self._ready = True
+
+    def fetch_clone(self) -> None:
+        pass
+
+    def add(self, refs: list[Reference]) -> None:
+        self.learnt.extend(refs)
 
     def seed(self, seed: int) -> None:
         pass

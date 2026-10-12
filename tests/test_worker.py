@@ -19,6 +19,7 @@ from herde.engines.text.stub import StubText
 from herde.engines.tts.core import TtsEngine
 from herde.engines.tts.stub_backend import StubBackend
 from herde.estimates import Speeds
+from herde.profile import ProfileStore
 from herde.state import State
 from herde.windows import parse_all
 from herde.worker import Link, Worker
@@ -42,6 +43,10 @@ class FakeProject:
         self.requests: list[tuple[str, dict]] = []
         self.forced: list[tuple[int, dict]] = []
         self.cancelled: set[int] = set()
+        # A profile (PROTOCOL.md, Profiles): the answer to `profile`, the files it names, and whether speech waits for a worker to run it.
+        self.profile: dict | None = None
+        self.files: dict[str, bytes] = {}
+        self.gate = True
 
     def add(self, id, kind="tts", cls="live", due_in=None, claim_in=None, voice="Sohee", lang="de", text=TEXT, model=None):
         model = model or ("qwen3-tts-1.7b" if kind == "tts" else "gemma4-31b")
@@ -62,10 +67,22 @@ class FakeProject:
         if self.forced:
             status, answer = self.forced.pop(0)
             return httpx.Response(status, json=answer)
+        if path == "profile":
+            return httpx.Response(200, json=self.profile) if self.profile else httpx.Response(404, json={"error": "not_found"})
+        if path.startswith("files/"):
+            data = self.files.get(path.removeprefix("files/")) if self.profile else None
+            return httpx.Response(200, content=data) if data is not None else httpx.Response(404, json={"error": "not_found"})
         if path == "poll":
-            offers = [] if not (self.offer_always or any(body["free"].values())) else [self._offer(t) for t in self.tasks.values() if t["state"] == "queued"]
+            said = body.get("profile") or {}
+            in_step = not self.profile or not self.gate or (said.get("hash") == self.profile["profile"] and said.get("state") == "ok")
+            offers = [] if not (self.offer_always or any(body["free"].values())) else [
+                self._offer(t) for t in self.tasks.values() if t["state"] == "queued" and (t["kind"] != "tts" or in_step)
+            ]
             cancel = [{"task": r["task"], "lease": r["lease"]} for r in body["running"] if r["task"] in self.cancelled]
-            return httpx.Response(200, json={"now": 0, "offers": offers[:10], "cancel": cancel, "need_caps": False, "retry_after": self.retry_after})
+            answer = {"now": 0, "offers": offers[:10], "cancel": cancel, "need_caps": False, "retry_after": self.retry_after}
+            if self.profile:
+                answer["profile"] = self.profile["profile"]
+            return httpx.Response(200, json=answer)
         m = re.fullmatch(r"tasks/(\d+)/(claim|result|fail)", path)
         t = self.tasks.get(int(m.group(1)))
         action = m.group(2)
@@ -128,14 +145,20 @@ class Backend(StubBackend):
 
     def preset(self, text, speaker, language, instruct, sampling):
         self.calls.append((text, speaker, language, instruct))
+        self.sampling = sampling
         if self.block is not None:
             self.block.wait(10)
         if self.error is not None:
             raise self.error
         return super().preset(text, speaker, language, instruct, sampling)
 
+    def clone(self, text, ref, language, sampling):
+        self.calls.append((text, ref.path.name, language, ""))
+        self.sampling = sampling
+        return super().clone(text, ref, language, sampling)
 
-def make(projects, tmp_path, backend=None, text=False, windows=(), local_now=None, gpu_slots=1, weights=None, project_windows=None):
+
+def make(projects, tmp_path, backend=None, text=False, windows=(), local_now=None, gpu_slots=1, weights=None, project_windows=None, load=True, bitrates=None):
     config = parse({"gpu_slots": gpu_slots, "tts": {"backend": "stub"}, "ui_port": 0}, tmp_path / "config.toml")
     if windows:
         config = config.__class__(**{**config.__dict__, "windows": parse_all(windows)})
@@ -143,14 +166,21 @@ def make(projects, tmp_path, backend=None, text=False, windows=(), local_now=Non
     for p in projects:
         pc = ProjectConfig(name=p.name, url=f"https://{p.name}.example.org/api/worker/v2", key=KEY, weight=(weights or {}).get(p.name, 1),
                            windows=parse_all((project_windows or {}).get(p.name, [])))
-        links.append(Link(pc, Connection(pc.name, pc.url, pc.key, transport=httpx.MockTransport(p.handler))))
+        links.append(Link(pc, Connection(pc.name, pc.url, pc.key, transport=httpx.MockTransport(p.handler)), ProfileStore(tmp_path / "projects" / p.name)))
     tts = TtsEngine(backend or Backend())
-    tts.load()
+    if load:
+        tts.load()
+
+    def encoder(pcm, rate, bitrate):
+        if bitrates is not None:
+            bitrates.append(bitrate)
+        return b"ID3MP3", len(pcm) // 2 * 1000 // rate
+
     text_engine = StubText((TextModel(name="gemma4-31b", tag="x"),)) if text else None
     state = State(tmp_path)
     speeds = Speeds(state, "stub")
     return Worker(config, links, tts, text_engine, state, speeds, platform={"os": "test", "arch": "x"},
-                  local_now=local_now or datetime.now, encoder=lambda pcm, rate: (b"ID3MP3", len(pcm) // 2 * 1000 // rate), scale=0.01)
+                  local_now=local_now or datetime.now, encoder=encoder, scale=0.01)
 
 
 def serve(worker, until, timeout=8.0, after=None):

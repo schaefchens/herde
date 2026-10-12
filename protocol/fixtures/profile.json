@@ -1,0 +1,73 @@
+{
+  "call": "profile",
+  "about": "What the project expects of every worker that speaks for it; the hash covers the rest of the answer, as canonical JSON.",
+  "request": {},
+  "response": {
+    "status": 200,
+    "body": {
+      "profile": "a99096f8ed2357cde16bf3d5ec09cac234d03d5ce256e1501cd5a6b6cfe2b9ab",
+      "tts": {
+        "model": "qwen3-tts-1.7b",
+        "code": 1,
+        "backends": {
+          "mlx": {
+            "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16@52f4770fd9726457eae3d3b6aa92047a25a10776",
+            "clone_model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16@a6eb4f68e4b056f1215157bb696209bc82a6db48"
+          },
+          "torch": {
+            "model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice@0c0e3051f131929182e2c023b9537f8b1c68adfe",
+            "clone_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base@fd4b254389122332181a7c3db7f27e918eec64e3"
+          }
+        },
+        "dtypes": [
+          "bf16"
+        ],
+        "speech": {
+          "chunk_chars": 300,
+          "pause_ms": 150,
+          "top_k": 50,
+          "top_p": 1.0,
+          "repetition_penalty": 1.05,
+          "mp3_kbps": 96
+        },
+        "voices": [
+          {
+            "id": "Faith",
+            "langs": {
+              "de": {
+                "file": "9c1e5f0a33333333333333333333333333333333333333333333333333333333",
+                "bytes": 675884,
+                "text": "Das war Mein Gott ist größer. Schön, dass ihr dabei seid."
+              },
+              "en": {
+                "file": "41f7c2d977777777777777777777777777777777777777777777777777777777",
+                "bytes": 833324,
+                "text": "That was My God Is Greater. Great to have you with us."
+              }
+            }
+          }
+        ],
+        "checks": {
+          "every": 21600,
+          "takes": [
+            {
+              "voice": "Faith",
+              "lang": "de",
+              "text": "Guten Abend, hier ist ARCHE. Schön, dass du dabei bist."
+            },
+            {
+              "voice": "Faith",
+              "lang": "en",
+              "text": "Good evening, this is ARCHE. Great to have you with us."
+            },
+            {
+              "voice": "Sohee",
+              "lang": "de",
+              "text": "Guten Abend, hier ist ARCHE. Schön, dass du dabei bist."
+            }
+          ]
+        }
+      }
+    }
+  }
+}

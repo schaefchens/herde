@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "herde"
-version = "0.4.0"
+version = "0.5.0"
 description = "A worker that does AI work — speech, text — for projects that host the herde protocol; it connects out, so it works behind any firewall."
 readme = "README.md"
 license = "Apache-2.0"

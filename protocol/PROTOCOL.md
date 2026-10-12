@@ -47,6 +47,8 @@ every exchange. Both sides test against them.
 | `POST tasks/{id}/claim` | Takes one task and gets its input |
 | `POST tasks/{id}/result` | Hands back what was made |
 | `POST tasks/{id}/fail` | Says why it could not be made |
+| `GET profile` | What the project expects of this worker: settings, voices, checks (see Profiles) |
+| `GET files/{sha256}` | A file the profile names, such as a voice's recording |
 | `GET tasks/{id}/input` | Reserved: a large input such as audio to transcribe |
 
 ### join
@@ -82,7 +84,8 @@ POST poll
   "caps_hash": "3f1a…",
   "caps": { … },
   "running": [{"task": 41, "lease": "b5e1…", "progress": 0.5}],
-  "free": {"tts": 0, "text": 0}
+  "free": {"tts": 0, "text": 0},
+  "profile": {"hash": "7d2c…", "state": "ok", "verified_ago": 120}
 }
 → 200
 {
@@ -93,6 +96,7 @@ POST poll
   ],
   "cancel": [{"task": 40, "lease": "a9c0…"}],
   "need_caps": false,
+  "profile": "7d2c…",
   "retry_after": 3
 }
 ```
@@ -106,6 +110,7 @@ POST poll
 - **`running`:** the tasks it holds, each with its lease. Listing a task keeps the lease alive (see Leases).
 - **`caps`:** what it can do (below). It is sent on the first poll after a start, whenever it changes, and when the project asked with `need_caps`. Otherwise only `caps_hash` goes: the SHA-256 of the caps as canonical JSON (keys sorted, no spaces, UTF-8).
 - **`kinds`:** the kinds and kind versions it speaks.
+- **`profile`:** how it stands with the project's profile (see Profiles). Sent while the project has one.
 
 **The project's side:**
 - **`offers`:** at most 10 tasks this worker could and may do, most urgent first, as **metadata only**. No text and no input, so a worker learns nothing it does not take.
@@ -113,6 +118,7 @@ POST poll
   - A project may send no offers while every `free` is 0.
 - **`cancel`:** held tasks the project no longer wants, because they were cancelled, are too late, or their lease lapsed. The worker stops them and sends nothing more about them.
 - **`need_caps`:** the project lost or doubts the caps; the next poll should carry them.
+- **`profile`:** the SHA-256 of this worker's profile, while the project has one (see Profiles).
 - **`retry_after`:** 1–60 seconds. **At most 15 while the worker holds tasks**, so leases stay alive.
 
 **Capabilities:**
@@ -126,7 +132,13 @@ POST poll
        {"id": "Sohee", "label": "Sohee", "langs": ["de", "en", "fr", "…"], "instruct": true},
        {"id": "Faith", "label": "Faith (own voice)", "langs": ["de", "en"], "instruct": false, "own": true}
      ],
-     "max_chars": 2000, "speed": {"chars_per_s": 7}},
+     "max_chars": 2000, "speed": {"chars_per_s": 7},
+     "setup": {"code": 1, "backend": "mlx", "dtype": "bf16",
+               "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16@52f4…",
+               "clone_model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16@a6eb…",
+               "speech": {"chunk_chars": 300, "pause_ms": 150, "top_k": 50, "top_p": 1.0, "repetition_penalty": 1.05, "mp3_kbps": 96},
+               "voices": {"Faith": {"de": "9c1e…", "en": "41f7…"}},
+               "checks": [{"voice": "Faith", "lang": "de", "ok": true, "cps": 12.4}]}},
     {"kind": "text", "model": "gemma4-31b", "location": "local",
      "json_schema": true, "context": 32768, "max_tokens": 4096,
      "speed": {"read_tps": 67, "write_tps": 11, "load_s": 15}, "loaded": true}
@@ -137,6 +149,12 @@ POST poll
 - **`location`:** `local`, or `cloud` for an engine that sends the input to a provider (coming later). A project that must keep data on its own machines offers such work only to local engines.
 - **`speed`** is measured by the worker and rounded. Projects may use it to judge whether anyone can finish in time.
 - **`instruct`:** whether a voice takes a spoken direction. Own voices are cloned from a recording and take none.
+- **`setup`:** what really shapes this worker's speech for this project:
+  - `code`: the version of herde's speech code — everything besides the model that a listener can hear (where a text is cut, the pause between pieces, how sampling is set);
+  - `backend` (`mlx`, `torch`, `stub`), the checkpoints it loaded as `repo@revision` (`clone_model`: the Base model for own voices, once one is there), and their number format (`dtype`);
+  - `speech`: the settings of every take;
+  - `voices`: its own voices' recordings by SHA-256, as it read them from disk;
+  - `checks`: the results of its last checks (see Profiles).
 
 ### claim
 
@@ -196,6 +214,40 @@ POST tasks/52/fail   {"lease": "4d8f…", "reason": "shutdown", "retry": true, "
 - **`error`** is a short reason for logs (at most 200 characters). It never quotes the input.
 - A fail sent again with the same lease gets the same answer.
 
+### profile
+
+What the project expects of every worker that speaks for it (see Profiles).
+
+```
+GET profile
+→ 200 {"profile": "7d2c…",
+       "tts": {"model": "qwen3-tts-1.7b", "code": 1,
+               "backends": {"mlx": {"model": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16@52f4…",
+                                    "clone_model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16@a6eb…"},
+                            "torch": {"model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice@0c0e…",
+                                      "clone_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base@fd4b…"}},
+               "dtypes": ["bf16"],
+               "speech": {"chunk_chars": 300, "pause_ms": 150, "top_k": 50, "top_p": 1.0, "repetition_penalty": 1.05, "mp3_kbps": 96},
+               "voices": [{"id": "Faith", "langs": {"de": {"file": "9c1e…", "bytes": 675884, "text": "…"}}}],
+               "checks": {"every": 21600, "takes": [{"voice": "Faith", "lang": "de", "text": "Guten Abend, hier ist ARCHE."}]}}}
+→ 404 {"error": "not_found"}   (no profile: the worker speaks as its owner set it up)
+```
+
+- **`profile`** is the SHA-256 of the rest of the answer as canonical JSON (like `caps_hash`), the same the poll answer names.
+- **`backends`:** the checkpoints each backend must have loaded, as `repo@revision`. A backend not listed may not speak for this project.
+- **`dtypes`:** the number formats its weights may run in: `bf16`; `fp16` on older NVIDIA cards; `fp32` on a CPU.
+- **`speech`:** the settings of every take: the size of a text's pieces, the pause between them, sampling, and the MP3's bitrate.
+- **`voices`:** the project's own voices. Per language: the recording (by its SHA-256, fetched with `files`), its size, and exactly what it says.
+- **`checks`:** how often in seconds the worker speaks its check takes (at least 600), and which.
+
+### files
+
+```
+GET files/9c1e…
+→ 200 the bytes (a voice's recording: audio/wav)
+→ 404 {"error": "not_found"}   (not a file of this worker's profile)
+```
+
 ### input (reserved)
 
 `GET tasks/{id}/input` with `X-Worker-Lease: <lease>` will return a large input as binary, such as audio to transcribe (kind `stt`, coming later). The input is given only while the lease holds. Workers never fetch any other URL a task might contain.
@@ -208,6 +260,48 @@ POST tasks/52/fail   {"lease": "4d8f…", "reason": "shutdown", "retry": true, "
   - A lapse counts as a failure, not as a bad result: a sleeping computer says nothing about the work.
 - **A task past `due_in`** is cancelled even while held, and turns up in `cancel`.
 - **A late result** whose lease lapsed is still taken if nobody claimed the task since. Otherwise it gets `gone`.
+
+## Profiles
+
+A project that lets many computers speak in one voice needs them all set up alike: another recording, checkpoint or setting is another speaker. So a project may hold a **profile**. Its workers take their setup from it and prove with every poll that they still run it.
+
+- **Announced.** Each poll answer names the worker's profile by its hash (`profile`). It is the worker's own: a project may give its workers different profiles, or all the same one.
+- **Fetched.** When the hash differs from the profile the worker runs, it calls `profile`, then `files` for each recording it lacks.
+  - Every file must match its SHA-256 and size (at most 10 MB).
+  - A recording must be fit to speak like one of the owner's own voices: PCM WAV, 3–30 s, its words at most 1000 characters.
+  - Files are kept, so a restart fetches nothing again.
+- **Applied.** For this project's tasks the worker:
+  - speaks with the profile's `speech` settings;
+  - offers the profile's own voices only, next to Qwen's presets — never its owner's own voices.
+- **Never downloaded by order.** A worker loads no checkpoint because a profile names it: its herde pins its own. When its backend, checkpoints, `dtype` or `code` are not the profile's, it cannot meet it (`unmet`) until its owner updates herde or changes the config.
+- **Verified.** At least every 10 minutes, the worker reads its recordings again and compares its whole setup with the profile. A file that changed is fetched again.
+- **Checked.** After every change, and every `checks.every` seconds while idle, the worker speaks the profile's check takes. Each must:
+  - end without an error;
+  - not be silent and not clip;
+  - run as long as its words need (6–30 characters a second).
+
+  A failed check is tried again after 10 minutes.
+- **Reported.** Every poll carries `profile`:
+  - `hash`: the profile the worker runs;
+  - `state` (below);
+  - `verified_ago`: seconds since it last verified its setup;
+  - `detail`: a short reason, for the project's admins.
+
+  The caps' `setup` says what it runs, and how its checks went.
+
+| `state` | The worker … |
+|---|---|
+| `ok` | runs the profile, verified, and its last checks passed |
+| `syncing` | is fetching or applying a profile |
+| `unmet` | cannot run it: another backend, checkpoint, `dtype` or `code` |
+| `failing` | failed its last checks |
+
+**The project's gate.** A project offers work of a kind its profile covers only to a worker that:
+- said `ok` with the current hash in its last poll;
+- verified at most 30 minutes ago;
+- has a `setup` that matches the profile. The project compares this itself, without taking the worker's word for it.
+
+A worker that sends no `profile` (an older herde) gets none of that work. An idle poll still writes nothing.
 
 ## Classes and times
 
@@ -262,9 +356,10 @@ Speech to text, after `input` is defined.
 - **Writes nothing for an idle poll.** No rows are touched when nothing changed: a shared host serves listeners from the same few processes. A project may update its "last seen" mark every 30 s.
 - **Rests a worker** that keeps failing (ARCHE: three failures in a row, then 10 minutes without offers).
 - **Holds lenders to one lease at a time** at most.
+- **With a profile, offers its kinds only to workers that run it** (see Profiles), and serves a worker only its own profile's files.
 
 **A worker:**
-- **Downloads nothing a task names:** models only from its owner's list.
+- **Downloads nothing a task names:** models only from its owner's list, and from a project only its profile and the files that profile names, through `profile` and `files`.
 - **Follows no URL found in a task,** and checks every id against the patterns in `schema.json`.
 - **Uses no tools in text tasks.**
 - **Keeps inputs and outputs only for the task's length,** and never writes them to a log.

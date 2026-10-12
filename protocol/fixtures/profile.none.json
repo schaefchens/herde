@@ -1,0 +1,11 @@
+{
+  "call": "profile",
+  "about": "No profile: the worker speaks for this project as its owner set it up.",
+  "request": {},
+  "response": {
+    "status": 404,
+    "body": {
+      "error": "not_found"
+    }
+  }
+}

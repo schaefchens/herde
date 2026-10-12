@@ -10,11 +10,15 @@ the voice by its name next to Qwen's presets, and a project picks it like
 one. The clone takes no direction: a moment's delivery does not reach it —
 the words, and how the recording sounds, carry the feeling.
 
+A project's profile brings voices of its own the same way (profile.py): its
+recordings are checked here exactly like the owner's.
+
 Standard library only: the tests run without the model's packages.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import wave
@@ -32,11 +36,17 @@ MAX_SECONDS = 30.0
 TEXT_MAX = 1000
 
 
+class BadRecording(ValueError):
+    """A recording that cannot be cloned from; the message says why."""
+
+
 @dataclass(frozen=True)
 class Reference:
     path: Path
     seconds: float
     text: str = field(repr=False)
+    # What a project's profile names the recording by, and what the caps' setup reports.
+    sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -75,33 +85,42 @@ def discover(folder: Path, languages: Iterable[str], presets: Iterable[str]) -> 
         if names.setdefault(name.lower(), name) != name:
             log.warning("voices: %s differs from %s only in case; left out", wav.name, names[name.lower()])
             continue
-        text = _words(wav.with_suffix(".txt"))
-        seconds = _seconds(wav)
-        if text is None or seconds is None:
+        words = wav.with_suffix(".txt")
+        if not words.is_file():
+            log.warning("voices: %s is missing (what the recording says, word for word); %s left out", words.name, wav.name)
             continue
-        refs.setdefault(name.lower(), {})[lang] = Reference(path=wav, seconds=seconds, text=text)
+        text = " ".join(words.read_text(encoding="utf-8").split())
+        if not text or len(text) > TEXT_MAX:
+            log.warning("voices: %s must hold the recording's words (1 to %d characters); left out", words.name, TEXT_MAX)
+            continue
+        try:
+            ref = reference(wav, text)
+        except BadRecording as e:
+            log.warning("voices: %s %s; left out", wav.name, e)
+            continue
+        refs.setdefault(name.lower(), {})[lang] = ref
     return {key: OwnVoice(name=names[key], refs=by_lang) for key, by_lang in refs.items()}
 
 
-def _words(path: Path) -> str | None:
-    if not path.is_file():
-        log.warning("voices: %s is missing (what the recording says, word for word); %s left out", path.name, path.with_suffix(".wav").name)
-        return None
-    text = " ".join(path.read_text(encoding="utf-8").split())
-    if not text or len(text) > TEXT_MAX:
-        log.warning("voices: %s must hold the recording's words (1 to %d characters); left out", path.name, TEXT_MAX)
-        return None
-    return text
-
-
-def _seconds(path: Path) -> float | None:
+def reference(path: Path, text: str, sha256: str | None = None) -> Reference:
+    """A recording fit to clone from, with its words — or BadRecording. `sha256`, when known, is checked too."""
+    words = " ".join(text.split())
+    if not words or len(words) > TEXT_MAX:
+        raise BadRecording(f"needs the recording's words (1 to {TEXT_MAX} characters)")
+    try:
+        data = path.read_bytes()
+    except OSError:
+        raise BadRecording("cannot be read") from None
+    digest = hashlib.sha256(data).hexdigest()
+    if sha256 is not None and digest != sha256:
+        raise BadRecording("is not the file its SHA-256 names")
     try:
         with wave.open(str(path), "rb") as w:
+            if w.getcomptype() != "NONE" or w.getsampwidth() not in (1, 2, 3, 4):
+                raise BadRecording("is no PCM WAV file")
             seconds = w.getnframes() / float(w.getframerate())
     except (wave.Error, EOFError, OSError, ZeroDivisionError):
-        log.warning("voices: %s is no PCM WAV file; left out", path.name)
-        return None
+        raise BadRecording("is no PCM WAV file") from None
     if not MIN_SECONDS <= seconds <= MAX_SECONDS:
-        log.warning("voices: %s runs %.1f s (%d to %d s fit); left out", path.name, seconds, MIN_SECONDS, MAX_SECONDS)
-        return None
-    return seconds
+        raise BadRecording(f"runs {seconds:.1f} s ({MIN_SECONDS:.0f} to {MAX_SECONDS:.0f} s fit)")
+    return Reference(path=path, seconds=seconds, text=words, sha256=digest)

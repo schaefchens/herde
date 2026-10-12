@@ -132,7 +132,7 @@ class StatusPage:
             for x in s.get("engines", [])
         ) or "<li>none</li>"
         projects = "".join(
-            f"<tr><td>{e(p['name'])}</td><td>{'connected' if p.get('ok') else e(p.get('last_error') or 'connecting…')}</td>"
+            f"<tr><td>{e(p['name'])}</td><td>{'connected' if p.get('ok') else e(p.get('last_error') or 'connecting…')}{self._profile(p.get('profile'))}</td>"
             f"<td>{len(p.get('running', []))}</td><td>{p.get('done', 0)}</td><td>{p.get('failed', 0)}</td></tr>"
             for p in s.get("projects", [])
         )
@@ -149,6 +149,15 @@ class StatusPage:
             f"<h2>Projects</h2><table><tr><th>Project</th><th>State</th><th>Running</th><th>Done</th><th>Failed</th></tr>{projects}</table>"
             f"<p><small>herde {e(str(s.get('version', '')))}</small></p></html>"
         )
+
+    @staticmethod
+    def _profile(p: dict | None) -> str:
+        """How the worker stands with the project's profile: what its owner may have to fix (an update, a config)."""
+        if not p:
+            return ""
+        said = {"ok": "runs its profile", "syncing": "taking on its profile", "unmet": "cannot run its profile", "failing": "failed its profile's checks"}
+        detail = f": {html.escape(p['detail'])}" if p.get("detail") else ""
+        return f"<br><small>{html.escape(said.get(p.get('state', ''), p.get('state', '')))}{detail}</small>"
 
     def _pause_forms(self) -> str:
         return "".join(self._form("/pause", label, hours=h) for h, label in (("1", "Pause 1 hour"), ("3", "Pause 3 hours"), ("0", "Pause until I resume")))

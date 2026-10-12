@@ -309,7 +309,7 @@ def test_a_real_worker_speaks_and_answers_jobs_from_the_page_end_to_end(tmp_path
         state = State(tmp_path)
         worker = Worker(config, [Link(pc, Connection(pc.name, pc.url, pc.key))], tts, StubText((TextModel(name="gemma4-31b", tag="x"),)),
                         state, Speeds(state, "stub"), platform={"os": "test", "arch": "x"}, local_now=datetime.now,
-                        encoder=lambda pcm, rate: (b"ID3" + b"\x00" * 64, len(pcm) // 2 * 1000 // rate), scale=0.05)
+                        encoder=lambda pcm, rate, *_: (b"ID3" + b"\x00" * 64, len(pcm) // 2 * 1000 // rate), scale=0.05)
 
         def done():
             jobs = {j["id"]: j for j in admin(http, project, "GET", "state").json()["jobs"]}

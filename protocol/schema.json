@@ -14,6 +14,55 @@
     "Seconds": {"type": "integer", "minimum": 0},
     "Trust": {"enum": ["own", "lender"]},
     "Location": {"enum": ["local", "cloud"]},
+    "Sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "Backend": {"enum": ["mlx", "torch", "stub"]},
+    "Dtype": {"enum": ["bf16", "fp16", "fp32"]},
+    "Checkpoint": {
+      "description": "A Hugging Face repository at a commit, \"repo@revision\"; empty where a backend loads none (the stub, or a Base model not loaded yet).",
+      "type": "string",
+      "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9._-]{0,95}(/[A-Za-z0-9][A-Za-z0-9._-]{0,95})?(@[0-9a-f]{40})?$"
+    },
+    "Speech": {
+      "type": "object",
+      "required": ["chunk_chars", "pause_ms", "top_k", "top_p", "repetition_penalty", "mp3_kbps"],
+      "properties": {
+        "chunk_chars": {"type": "integer", "minimum": 50, "maximum": 2000},
+        "pause_ms": {"type": "integer", "minimum": 0, "maximum": 2000},
+        "top_k": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "top_p": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "repetition_penalty": {"type": "number", "minimum": 1, "maximum": 2},
+        "mp3_kbps": {"type": "integer", "minimum": 32, "maximum": 320}
+      }
+    },
+    "CheckResult": {
+      "type": "object",
+      "required": ["voice", "lang", "ok"],
+      "properties": {
+        "voice": {"$ref": "#/$defs/VoiceId"},
+        "lang": {"$ref": "#/$defs/Lang"},
+        "ok": {"type": "boolean"},
+        "cps": {"type": "number", "minimum": 0},
+        "error": {"type": "string", "maxLength": 200}
+      }
+    },
+    "Setup": {
+      "type": "object",
+      "required": ["code", "backend", "model", "clone_model", "dtype", "speech", "voices"],
+      "properties": {
+        "code": {"type": "integer", "minimum": 1},
+        "backend": {"$ref": "#/$defs/Backend"},
+        "model": {"$ref": "#/$defs/Checkpoint"},
+        "clone_model": {"$ref": "#/$defs/Checkpoint"},
+        "dtype": {"anyOf": [{"$ref": "#/$defs/Dtype"}, {"const": ""}]},
+        "speech": {"$ref": "#/$defs/Speech"},
+        "voices": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/VoiceId"},
+          "additionalProperties": {"type": "object", "propertyNames": {"$ref": "#/$defs/Lang"}, "additionalProperties": {"$ref": "#/$defs/Sha256"}}
+        },
+        "checks": {"type": "array", "items": {"$ref": "#/$defs/CheckResult"}, "maxItems": 40}
+      }
+    },
     "KindVersions": {
       "type": "object",
       "propertyNames": {"$ref": "#/$defs/Kind"},
@@ -88,7 +137,8 @@
         "speed": {
           "type": "object",
           "properties": {"chars_per_s": {"type": "number", "exclusiveMinimum": 0}}
-        }
+        },
+        "setup": {"$ref": "#/$defs/Setup"}
       }
     },
     "TextEngine": {
@@ -162,7 +212,19 @@
           "type": "object",
           "propertyNames": {"$ref": "#/$defs/Kind"},
           "additionalProperties": {"type": "integer", "minimum": 0}
-        }
+        },
+        "profile": {"$ref": "#/$defs/ProfileReport"}
+      }
+    },
+    "ProfileReport": {
+      "description": "How the worker stands with the project's profile, with every poll while the project has one.",
+      "type": "object",
+      "required": ["hash", "state", "verified_ago"],
+      "properties": {
+        "hash": {"anyOf": [{"$ref": "#/$defs/Sha256"}, {"const": ""}]},
+        "state": {"enum": ["ok", "syncing", "unmet", "failing"]},
+        "verified_ago": {"$ref": "#/$defs/Seconds"},
+        "detail": {"type": "string", "maxLength": 200}
       }
     },
     "Offer": {
@@ -203,7 +265,84 @@
           }
         },
         "need_caps": {"type": "boolean"},
+        "profile": {"$ref": "#/$defs/Sha256"},
         "retry_after": {"type": "integer", "minimum": 1, "maximum": 60}
+      }
+    },
+
+    "Empty": {"description": "A GET carries no body.", "type": "object", "maxProperties": 0},
+    "TtsProfile": {
+      "type": "object",
+      "required": ["model", "code", "backends", "dtypes", "speech", "voices", "checks"],
+      "properties": {
+        "model": {"$ref": "#/$defs/Model"},
+        "code": {"type": "integer", "minimum": 1},
+        "backends": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"$ref": "#/$defs/Backend"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["model", "clone_model"],
+            "properties": {"model": {"$ref": "#/$defs/Checkpoint"}, "clone_model": {"$ref": "#/$defs/Checkpoint"}}
+          }
+        },
+        "dtypes": {"type": "array", "items": {"$ref": "#/$defs/Dtype"}, "minItems": 1, "uniqueItems": true},
+        "speech": {"$ref": "#/$defs/Speech"},
+        "voices": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": ["id", "langs"],
+            "properties": {
+              "id": {"$ref": "#/$defs/VoiceId"},
+              "langs": {
+                "type": "object",
+                "minProperties": 1,
+                "maxProperties": 10,
+                "propertyNames": {"$ref": "#/$defs/Lang"},
+                "additionalProperties": {
+                  "type": "object",
+                  "required": ["file", "bytes", "text"],
+                  "properties": {
+                    "file": {"$ref": "#/$defs/Sha256"},
+                    "bytes": {"type": "integer", "minimum": 1, "maximum": 10485760},
+                    "text": {"type": "string", "minLength": 1, "maxLength": 1000}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "required": ["every", "takes"],
+          "properties": {
+            "every": {"type": "integer", "minimum": 600},
+            "takes": {
+              "type": "array",
+              "maxItems": 40,
+              "items": {
+                "type": "object",
+                "required": ["voice", "lang", "text"],
+                "properties": {
+                  "voice": {"$ref": "#/$defs/VoiceId"},
+                  "lang": {"$ref": "#/$defs/Lang"},
+                  "text": {"type": "string", "minLength": 1, "maxLength": 500}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ProfileResponse": {
+      "type": "object",
+      "required": ["profile"],
+      "properties": {
+        "profile": {"$ref": "#/$defs/Sha256"},
+        "tts": {"$ref": "#/$defs/TtsProfile"}
       }
     },
 

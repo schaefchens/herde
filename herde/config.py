@@ -31,16 +31,18 @@ LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 PROJECT_NAME = re.compile(r"[A-Za-z0-9_.-]{1,40}")
 TTS_BACKENDS = ("mlx", "torch", "stub")
 TEXT_BACKENDS = ("ollama", "stub")
-# The checkpoints each backend loads, pinned where a revision is known to work.
+# The checkpoints each backend loads, every one pinned: a project's profile names them (PROTOCOL.md,
+# Profiles), and a new upload must never make two speakers of one voice.
 TTS_DEFAULTS: dict[str, dict[str, str]] = {
     # The revisions the qwen3-tts-ui demo pins on the M1 Max: its download can be reused as is.
     "mlx": {
         "model": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16", "revision": "52f4770fd9726457eae3d3b6aa92047a25a10776",
         "clone_model": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16", "clone_revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48",
     },
+    # Qwen's own, as every torch worker has fetched them since January (their last changes: 2026-01-29 and 2026-01-23).
     "torch": {
-        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", "revision": "",
-        "clone_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "clone_revision": "",
+        "model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", "revision": "0c0e3051f131929182e2c023b9537f8b1c68adfe",
+        "clone_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "clone_revision": "fd4b254389122332181a7c3db7f27e918eec64e3",
     },
     "stub": {"model": "", "revision": "", "clone_model": "", "clone_revision": ""},
 }

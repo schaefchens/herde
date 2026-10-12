@@ -9,8 +9,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .core import Sampling, to_pcm16
+from .core import Sampling, at, to_pcm16
 from .voices import Reference
+
+# mlx's names for the number formats, as setups and profiles name them.
+DTYPES = {"bfloat16": "bf16", "float16": "fp16", "float32": "fp32"}
 
 
 class MlxBackend:
@@ -25,10 +28,21 @@ class MlxBackend:
         self._model = None
         self._clone = None
         self._refs: dict[Path, object] = {}
+        self._dtype = ""
 
     @property
     def ready(self) -> bool:
         return self._model is not None
+
+    @property
+    def dtype(self) -> str:
+        return self._dtype
+
+    def pins(self) -> tuple[str, str]:
+        return at(self.model_id, self.revision), at(self.clone_model, self.clone_revision)
+
+    def checkpoints(self) -> tuple[str, str]:
+        return at(self.model_id, self.revision), at(self.clone_model, self.clone_revision) if self._clone is not None else ""
 
     def load(self, refs: list[Reference]) -> None:
         # Read when huggingface_hub is imported: set before mlx-audio comes in.
@@ -40,17 +54,32 @@ class MlxBackend:
         model = load_model(self.model_id, revision=self.revision or None)
         if model.config.tts_model_type != "custom_voice":
             raise ValueError(f"{self.model_id} is no Qwen3-TTS CustomVoice model")
+        self._dtype = _dtype_of(model)
         if refs:
-            from mlx_audio.utils import load_audio
+            self.add(refs)
+        # Last: ready means every model a task may name is there.
+        self._model = model
+
+    def fetch_clone(self) -> None:
+        if self._clone is None and self.clone_model:
+            from huggingface_hub import snapshot_download
+
+            snapshot_download(self.clone_model, revision=self.clone_revision or None)
+
+    def add(self, refs: list[Reference]) -> None:
+        from mlx_audio.utils import load_audio
+
+        if self._clone is None:
+            from mlx_audio.tts.utils import load_model
 
             clone = load_model(self.clone_model, revision=self.clone_revision or None)
             if clone.config.tts_model_type != "base":
                 raise ValueError(f"{self.clone_model} is no Qwen3-TTS Base model")
-            # Read once: mlx-audio keeps a recording's encoding for the takes after the first.
-            self._refs = {ref.path: load_audio(str(ref.path), sample_rate=clone.sample_rate) for ref in refs}
             self._clone = clone
-        # Last: ready means every model a task may name is there.
-        self._model = model
+        for ref in refs:
+            # Read once: mlx-audio keeps a recording's encoding for the takes after the first.
+            if ref.path not in self._refs:
+                self._refs[ref.path] = load_audio(str(ref.path), sample_rate=self._clone.sample_rate)
 
     def seed(self, seed: int) -> None:
         import mlx.core as mx
@@ -75,6 +104,17 @@ class MlxBackend:
         if rate is None:
             raise RuntimeError("the model returned no audio")
         return b"".join(pcm), rate
+
+
+def _dtype_of(model) -> str:
+    """The number format most of the weights run in: a conversion may keep a norm or two in float32."""
+    from mlx.utils import tree_flatten
+
+    sizes: dict[str, int] = {}
+    for _, p in tree_flatten(model.parameters()):
+        name = str(p.dtype).rsplit(".", 1)[-1]
+        sizes[name] = sizes.get(name, 0) + int(p.size)
+    return DTYPES.get(max(sizes, key=sizes.__getitem__), "") if sizes else ""
 
 
 def _kwargs(s: Sampling) -> dict:

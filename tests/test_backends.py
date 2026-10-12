@@ -121,6 +121,10 @@ class FakeMlxModel:
         self.calls.append(("clone", kw))
         return iter([types.SimpleNamespace(sample_rate=24000, audio=np.zeros(480, dtype=np.float32))])
 
+    def parameters(self):
+        # A bf16 conversion that keeps a norm in float32, as mlx-community's do.
+        return {"weight": types.SimpleNamespace(dtype="mlx.core.bfloat16", size=4096), "norm": types.SimpleNamespace(dtype="mlx.core.float32", size=64)}
+
 
 @pytest.fixture
 def fake_mlx(monkeypatch):
@@ -138,6 +142,7 @@ def fake_mlx(monkeypatch):
     monkeypatch.setitem(sys.modules, "mlx_audio.utils", types.SimpleNamespace(load_audio=lambda path, sample_rate: f"audio of {path}"))
     monkeypatch.setitem(sys.modules, "mlx", types.ModuleType("mlx"))
     monkeypatch.setitem(sys.modules, "mlx.core", types.SimpleNamespace(random=types.SimpleNamespace(seed=seeds.append)))
+    monkeypatch.setitem(sys.modules, "mlx.utils", types.SimpleNamespace(tree_flatten=lambda tree: list(tree.items())))
     return models, seeds
 
 
@@ -153,6 +158,8 @@ def test_mlx_speaks_as_the_arche_worker_did(fake_mlx, tmp_path, monkeypatch):
     engine = TtsEngine(backend, own=discover(tmp_path, ("de", "en"), ("Sohee",)))
     engine.load()
     assert models["mlx-community/CustomVoice"].revision == "rev1" and models["mlx-community/Base"].revision is None
+    assert backend.dtype == "bf16", "what most of the weights are in"
+    assert backend.checkpoints() == ("mlx-community/CustomVoice@rev1", "mlx-community/Base"), "as a setup reports them"
     engine.synthesize("Guten Abend.", "Sohee", "de", "Warm.", 0.7, 9)
     kind, kw = models["mlx-community/CustomVoice"].calls[-1]
     assert kind == "custom" and (kw["speaker"], kw["language"], kw["instruct"], kw["stream"], kw["verbose"]) == ("Sohee", "German", "Warm.", False, False)

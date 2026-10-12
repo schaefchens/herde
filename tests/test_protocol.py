@@ -7,11 +7,12 @@ from conftest import SCHEMA, all_fixtures, fixture
 from jsonschema import Draft202012Validator
 
 from herde import PROTOCOL
-from herde.protocol import KIND_VERSIONS, ProtocolError, caps_hash, parse_claim, parse_join, parse_poll, poll_body
+from herde.profile import parse as parse_profile
+from herde.protocol import KIND_VERSIONS, ProtocolError, canonical_hash, caps_hash, parse_claim, parse_join, parse_poll, poll_body
 
 schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-REQUEST = {"join": "JoinRequest", "poll": "PollRequest", "claim": "ClaimRequest", "fail": "FailRequest"}
-RESPONSE = {"join": "JoinResponse", "poll": "PollResponse", "claim": "ClaimResponse", "result": "ResultResponse", "fail": "FailResponse"}
+REQUEST = {"join": "JoinRequest", "poll": "PollRequest", "claim": "ClaimRequest", "fail": "FailRequest", "profile": "Empty", "files": "Empty"}
+RESPONSE = {"join": "JoinResponse", "poll": "PollResponse", "claim": "ClaimResponse", "result": "ResultResponse", "fail": "FailResponse", "profile": "ProfileResponse"}
 
 
 def valid(defname: str, instance) -> list[str]:
@@ -105,3 +106,22 @@ def test_a_join_answer_gives_the_key_and_the_trust():
         parse_join({"key": "short", "worker": {}, "project": {"protocol": 2}})
     with pytest.raises(ProtocolError):
         parse_join({**fixture("join.ok")["response"]["body"], "project": {"name": "x", "protocol": 3}})
+
+
+def test_a_profiles_hash_is_its_content_as_canonical_json():
+    doc = fixture("profile")["response"]["body"]
+    assert canonical_hash({k: v for k, v in doc.items() if k != "profile"}) == doc["profile"]
+    profile = parse_profile(doc)
+    assert sorted(profile.backends) == ["mlx", "torch"] and list(profile.voices) == ["Faith"] and len(profile.takes) == 3
+    assert fixture("poll.profile")["response"]["body"]["profile"] == doc["profile"], "the poll names the profile it answers with"
+
+
+def test_the_worker_reports_on_the_profile_and_reads_its_hash():
+    ok = fixture("poll.profile")["request"]
+    body = poll_body("ready", ok["caps"], True, [], {"tts": 1, "text": 1}, KIND_VERSIONS, "herde/0.5.0", profile=ok["profile"])
+    assert body == ok
+    assert caps_hash(ok["caps"]) == ok["caps_hash"]
+    answer = parse_poll("arche", fixture("poll.profile-syncing")["response"]["body"], received=0.0)
+    assert answer.profile == fixture("profile")["response"]["body"]["profile"]
+    assert parse_poll("arche", fixture("poll.idle")["response"]["body"], received=0.0).profile == "", "no profile, no hash"
+    assert parse_poll("arche", {"retry_after": 5, "profile": "not a hash"}, received=0.0).profile == "", "a hash that does not fit is none"

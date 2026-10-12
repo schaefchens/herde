@@ -4,7 +4,7 @@
 # How this computer shows up to its projects (default: its host name).
 # name = "studio-mac"
 
-# MP3 for listeners on their phones; 96k mono is plenty for speech.
+# MP3 for listeners on their phones; 96k mono is plenty for speech. A project's profile sets its own (README: profiles).
 mp3_bitrate = "96k"
 # Keep a Mac from idle sleep while the worker runs (caffeinate).
 keep_awake = true
@@ -38,9 +38,10 @@ backend = ""
 # clone_revision = "a6eb4f68e4b056f1215157bb696209bc82a6db48"
 # Reuse a download that is already there, e.g. the qwen3-tts-ui demo's:
 # hf_home = "~/Projects/schaefchens/qwen3-tts-ui/.runtime/huggingface"
-# Voices of your own (README: "Voices of your own"): <Name>.<lang>.wav and .txt in this folder.
+# Voices of your own (README: "Speech"): <Name>.<lang>.wav and .txt in this folder; not offered to a project with a profile.
 # voices = "~/.config/herde/voices"
 # Characters per take: each piece of a text is spoken on its own. `herde lab` compares sizes by ear.
+# A project's profile sets its own.
 chunk_chars = 300
 # torch only: which GPU. ROCm names an AMD GPU cuda too.
 # device = "cuda:0"

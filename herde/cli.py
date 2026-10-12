@@ -32,6 +32,7 @@ from .engines.tts import build as build_tts
 from .engines.tts.mp3 import EncodeError, encode, find_ffmpeg
 from .estimates import Speeds
 from .machine import platform_info
+from .profile import ProfileStore, folder_name
 from .protocol import KIND_VERSIONS, poll_body
 from .serve import DEFAULT_PORT, default_data, serve_command
 from .state import PauseError, State, parse_pause
@@ -148,7 +149,8 @@ def build(config: Config) -> Worker:
     tts = build_tts(config.tts, config.limits.tts_chars)
     text = build_text(config.text, config.limits.text_max_tokens)
     speeds = Speeds(state, config.tts.backend)
-    links = [Link(p, Connection(p.name, p.url, p.key)) for p in config.projects]
+    # Each project's profile and recordings in a folder of its own (profile.py): projects/<name>/ beside the keys.
+    links = [Link(p, Connection(p.name, p.url, p.key), ProfileStore(config.state_dir / "projects" / folder_name(p.name))) for p in config.projects]
     return Worker(config, links, tts, text, state, speeds, platform=platform_info())
 
 
@@ -231,7 +233,8 @@ async def _check_project(config: Config, p: ProjectConfig, platform: dict) -> bo
     kinds = {k: KIND_VERSIONS[k] for k in p.kinds}
     try:
         answer = await conn.poll(poll_body("loading", caps, True, [], {k: 0 for k in kinds}, kinds, f"herde/{VERSION}"), time.monotonic())
-        print(f"{p.name} ({p.url}): ok, next poll in {answer.retry_after:.0f} s")
+        profile = f"; it holds a profile ({answer.profile[:12]}…), which the worker fetches and runs" if answer.profile else ""
+        print(f"{p.name} ({p.url}): ok, next poll in {answer.retry_after:.0f} s{profile}")
         return True
     except ProjectError as e:
         print(f"{p.name} ({p.url}): {e}")
@@ -451,6 +454,9 @@ def status_command(state: State, as_json: bool) -> int:
     for p in s.get("projects", []):
         running = ", ".join(f"task {r['task']} ({r['kind']}, {int(r['progress'] * 100)} %)" for r in p.get("running", [])) or "idle"
         print(f"  {p['name']}: {'connected' if p.get('ok') else p.get('last_error') or 'connecting'}; {running}; done {p.get('done', 0)}, failed {p.get('failed', 0)}")
+        if p.get("profile"):
+            pr = p["profile"]
+            print(f"    its profile: {pr.get('state')}" + (f" ({pr['detail']})" if pr.get("detail") else ""))
     return 0
 
 

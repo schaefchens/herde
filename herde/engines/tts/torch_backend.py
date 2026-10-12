@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .core import Sampling, to_pcm16
+from .core import Sampling, at, to_pcm16
 from .voices import Reference
 
 
@@ -31,16 +31,27 @@ class TorchBackend:
         self._model = None
         self._clone = None
         self._prompts: dict[Path, object] = {}
+        self._torch_dtype: object = None
+        self._dtype = ""
 
     @property
     def ready(self) -> bool:
         return self._model is not None
 
+    @property
+    def dtype(self) -> str:
+        return self._dtype
+
+    def pins(self) -> tuple[str, str]:
+        return at(self.model_id, self.revision), at(self.clone_model, self.clone_revision)
+
+    def checkpoints(self) -> tuple[str, str]:
+        return at(self.model_id, self.revision), at(self.clone_model, self.clone_revision) if self._clone is not None else ""
+
     def load(self, refs: list[Reference]) -> None:
         if self.hf_home is not None:
             os.environ.setdefault("HF_HOME", str(self.hf_home))
         import torch
-        from qwen_tts import Qwen3TTSModel
 
         if self.device.startswith("cuda") and not torch.cuda.is_available():
             if torch.version.hip:
@@ -48,24 +59,37 @@ class TorchBackend:
             raise RuntimeError("no CUDA GPU visible: start the container with the NVIDIA runtime (compose.nvidia.yaml)")
         # bf16 where the GPU has it (NVIDIA's Ampere and newer; torch says every AMD GPU); fp16 on older cards; fp32 on a CPU.
         if self.device.startswith("cuda"):
-            dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            self._torch_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         else:
-            dtype = torch.float32
-
-        def load_one(model_id: str, revision: str):
-            kwargs: dict = {"device_map": self.device, "dtype": dtype}
-            if revision:
-                kwargs["revision"] = revision
-            return Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-
-        model = load_one(self.model_id, self.revision)
+            self._torch_dtype = torch.float32
+        self._dtype = {torch.bfloat16: "bf16", torch.float16: "fp16", torch.float32: "fp32"}[self._torch_dtype]
+        model = self._load_one(self.model_id, self.revision)
         if refs:
-            clone = load_one(self.clone_model, self.clone_revision)
-            # Made once: the recording's features would otherwise be computed again for every take.
-            self._prompts = {ref.path: clone.create_voice_clone_prompt(ref_audio=str(ref.path), ref_text=ref.text) for ref in refs}
-            self._clone = clone
+            self.add(refs)
         # Last: ready means every model a task may name is there.
         self._model = model
+
+    def _load_one(self, model_id: str, revision: str):
+        from qwen_tts import Qwen3TTSModel
+
+        kwargs: dict = {"device_map": self.device, "dtype": self._torch_dtype}
+        if revision:
+            kwargs["revision"] = revision
+        return Qwen3TTSModel.from_pretrained(model_id, **kwargs)
+
+    def fetch_clone(self) -> None:
+        if self._clone is None and self.clone_model:
+            from huggingface_hub import snapshot_download
+
+            snapshot_download(self.clone_model, revision=self.clone_revision or None)
+
+    def add(self, refs: list[Reference]) -> None:
+        if self._clone is None:
+            self._clone = self._load_one(self.clone_model, self.clone_revision)
+        for ref in refs:
+            # Made once: the recording's features would otherwise be computed again for every take.
+            if ref.path not in self._prompts:
+                self._prompts[ref.path] = self._clone.create_voice_clone_prompt(ref_audio=str(ref.path), ref_text=ref.text)
 
     def seed(self, seed: int) -> None:
         import torch

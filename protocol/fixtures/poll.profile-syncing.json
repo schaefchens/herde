@@ -1,0 +1,51 @@
+{
+  "call": "poll",
+  "about": "A new computer still taking on the profile: the project names it, and offers no speech until the worker runs it.",
+  "request": {
+    "protocol": 2,
+    "version": "herde/0.5.0",
+    "kinds": {
+      "tts": [
+        1
+      ],
+      "text": [
+        1
+      ]
+    },
+    "state": "ready",
+    "caps_hash": "81b446438870e420a791bfa47272de2c8a0a189df6d00a17557f140d077f2f3b",
+    "running": [],
+    "free": {
+      "tts": 1,
+      "text": 1
+    },
+    "profile": {
+      "hash": "",
+      "state": "syncing",
+      "verified_ago": 0,
+      "detail": "fetching the Base model for its own voices"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "now": 1760011240,
+      "offers": [
+        {
+          "task": 60,
+          "kind": "text",
+          "class": "background",
+          "model": "gemma4-31b",
+          "size": {
+            "input_tokens": 3912,
+            "max_tokens": 1024
+          }
+        }
+      ],
+      "cancel": [],
+      "need_caps": false,
+      "profile": "a99096f8ed2357cde16bf3d5ec09cac234d03d5ce256e1501cd5a6b6cfe2b9ab",
+      "retry_after": 10
+    }
+  }
+}

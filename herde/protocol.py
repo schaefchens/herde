@@ -24,6 +24,9 @@ VOICE_ID = re.compile(r"[A-Za-z0-9_-]{1,40}")
 MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
 LANG = re.compile(r"[a-z]{2}")
 ERROR_CODE = re.compile(r"[a-z_]{2,40}")
+SHA256 = re.compile(r"[0-9a-f]{64}")
+# A Hugging Face repository at a commit, as profiles and setups name a checkpoint (empty: none).
+CHECKPOINT = re.compile(r"|[A-Za-z0-9][A-Za-z0-9._-]{0,95}(/[A-Za-z0-9][A-Za-z0-9._-]{0,95})?(@[0-9a-f]{40})?")
 KINDS = ("tts", "text")
 # The kinds and kind versions this worker speaks.
 KIND_VERSIONS: dict[str, list[int]] = {"tts": [1], "text": [1]}
@@ -65,6 +68,8 @@ class PollAnswer:
     cancel: tuple[tuple[int, str], ...]
     need_caps: bool
     retry_after: float
+    # The SHA-256 of this worker's profile at the project ("": it has none).
+    profile: str = ""
 
 
 @dataclass(frozen=True)
@@ -146,14 +151,18 @@ class Joined:
     key: str = field(repr=False)
 
 
+def canonical_hash(value: object) -> str:
+    """SHA-256 of canonical JSON: keys sorted, no spaces, UTF-8 (caps and profiles alike)."""
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
 def caps_hash(caps: dict) -> str:
-    """SHA-256 of the caps as canonical JSON: keys sorted, no spaces, UTF-8."""
-    return hashlib.sha256(json.dumps(caps, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+    return canonical_hash(caps)
 
 
 def poll_body(
     state: str, caps: dict, send_caps: bool, running: list[dict], free: dict[str, int], kinds: dict[str, list[int]], version: str,
-    resume_in: int | None = None,
+    resume_in: int | None = None, profile: dict | None = None,
 ) -> dict:
     body: dict[str, Any] = {
         "protocol": PROTOCOL,
@@ -168,6 +177,8 @@ def poll_body(
         body["resume_in"] = max(0, int(resume_in))
     if send_caps:
         body["caps"] = caps
+    if profile is not None:
+        body["profile"] = profile
     return body
 
 
@@ -207,7 +218,7 @@ def parse_poll(project: str, data: Any, received: float) -> PollAnswer:
     now = _int(data.get("now")) or 0
     return PollAnswer(
         now=now, offers=tuple(offers), cancel=tuple(cancel), need_caps=data.get("need_caps") is True,
-        retry_after=max(RETRY_MIN, min(RETRY_MAX, retry)),
+        retry_after=max(RETRY_MIN, min(RETRY_MAX, retry)), profile=_str(data.get("profile"), SHA256) or "",
     )
 
 

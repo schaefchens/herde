@@ -1,13 +1,15 @@
-"""One project's calls (protocol/PROTOCOL.md): join, poll, claim, result, fail.
+"""One project's calls (protocol/PROTOCOL.md): join, poll, claim, result, fail, and its profile and files.
 
 The key travels in `X-Worker-Key`: an Authorization header never reaches PHP
 on some shared hosts. Redirects are not followed, so a moved address can never
 take the key to another host. A project's error answers become exceptions the
-worker knows how to wait out; a task that is gone is no error at all.
+worker knows how to wait out; a task that is gone is no error at all. What a
+project hands over is read only up to the size it may have.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 import httpx
@@ -96,6 +98,40 @@ class Connection:
         # Gone meanwhile (cancelled, or the lease ran out): nothing left to report.
         if response.status_code not in (404, 409):
             self._json(response)
+
+    async def profile(self, limit: int) -> object:
+        """The project's profile for this worker, as JSON (the caller checks it: profile.parse)."""
+        status, body = await self._get("profile", limit)
+        if status != 200:
+            raise ProjectError(f"{self.name}: no profile (HTTP {status}), though its poll named one")
+        try:
+            return json.loads(body)
+        except ValueError:
+            raise ProjectError(f"{self.name}: its profile is not JSON") from None
+
+    async def file(self, sha: str, size: int) -> bytes:
+        """A file the profile names, exactly as large as it says."""
+        status, body = await self._get(f"files/{sha}", size)
+        if status != 200 or len(body) != size:
+            raise ProjectError(f"{self.name}: the file {sha[:12]}… did not come (HTTP {status}, {len(body)} of {size} bytes)")
+        return body
+
+    async def _get(self, path: str, limit: int) -> tuple[int, bytes]:
+        """A GET whose body is read only up to `limit` bytes: a project cannot fill this computer's memory or disk."""
+        try:
+            async with self._client.stream("GET", path) as response:
+                if response.status_code != 200:
+                    await response.aread()
+                    _checked(self.name, response)
+                    return response.status_code, b""
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    body += chunk
+                    if len(body) > limit:
+                        raise ProjectError(f"{self.name}: {path} is larger than the {limit} bytes it may be")
+                return 200, bytes(body)
+        except httpx.HTTPError as e:
+            raise ProjectError(f"{self.name}: {type(e).__name__}") from None
 
     def _outcome(self, response: httpx.Response) -> Outcome:
         if response.status_code in (404, 409):

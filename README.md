@@ -163,6 +163,27 @@ cut into takes, the temperature) for you to compare by ear; ARCHE's
 `bin/replay-show.php` writes such a file. `herde bench` measures this
 computer's speed with the real models, so the scheduler's first estimates fit.
 
+### A project's profile: one setup on every computer
+
+A project that lets many computers speak in one voice can hold a profile
+([PROTOCOL.md](protocol/PROTOCOL.md), Profiles): the checkpoints and number
+format it accepts, the settings of every take (the size of a text's pieces,
+the pause between them, sampling, the MP3's bitrate), its own voices with
+their recordings, and check takes. Another recording or setting would be
+another speaker. herde fetches the profile whenever the project's polls name a
+new one, keeps it with its recordings in `projects/<name>/` beside the config,
+and for that project:
+
+- speaks with the profile's settings, in place of `[tts] chunk_chars` and `mp3_bitrate`;
+- offers the profile's own voices next to Qwen's presets, never those in your voices folder;
+- speaks the check takes after every change and every few hours, and verifies
+  its recordings and setup every 10 minutes;
+- takes none of the project's speech until all that holds, and says so with every poll.
+
+A profile never makes herde download a model. When this computer's backend,
+checkpoints or number format are not the profile's, `herde status` and the
+status page say what differs: update herde, or change the config.
+
 ## Text
 
 Through Ollama: a model is offered under the name projects ask for, mapped to
@@ -177,8 +198,9 @@ model that writes only blank space is stopped early.
   only to computers it trusts as its own; a lent computer gets public work.
 - The worker keeps a task's input and output only while it works on it and
   never writes them to its log. Keys live in files readable only by you.
-- It follows no URL a task names, downloads nothing a task names, gives text
-  models no tools, and checks every id against the protocol's patterns.
+- It follows no URL a task names and downloads nothing a task names; from a
+  project, only its profile and the recordings that profile names. It gives
+  text models no tools, and checks every id against the protocol's patterns.
 - Keep a Mac's disk encrypted (FileVault). If a key gets out, the project's
   admin issues a new one.
 
@@ -224,12 +246,13 @@ Scripts use the same API as the page, with the key in `X-Herde-Token`:
 ## For a project
 
 Implement [protocol/PROTOCOL.md](protocol/PROTOCOL.md): five calls, JSON over
-HTTPS, the key in `X-Worker-Key`. [protocol/schema.json](protocol/schema.json)
+HTTPS, the key in `X-Worker-Key` — and two more for a profile, when many
+computers must speak alike. [protocol/schema.json](protocol/schema.json)
 describes every message and [protocol/fixtures](protocol/fixtures) holds an
 example of every exchange — test your side against them. Two working
 implementations: `herde serve` ([herde/serve/project.py](herde/serve/project.py),
-Python and SQLite, about 500 lines), and ARCHE's PHP (`server/app/Workers/` in
-its repo) on shared hosting.
+Python and SQLite, about 500 lines, without a profile), and ARCHE's PHP
+(`server/app/Workers/` in its repo, with one) on shared hosting.
 
 ## Tests
 

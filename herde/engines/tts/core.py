@@ -28,6 +28,11 @@ LANGUAGES = {
 }
 # What projects ask for: the same name on every worker, whichever checkpoint speaks a voice.
 MODEL_NAME = "qwen3-tts-1.7b"
+# The version of this speech code: everything besides the model that a listener can hear — where a
+# text is cut (split_text), the pause between pieces, how sampling is set, how long a take may run.
+# A project's profile names the one it expects (PROTOCOL.md, Profiles): raise it with any such change,
+# or computers on two herde versions speak alike in name only.
+CODE = 1
 # Each piece of a text is a take of its own, and its delivery starts afresh:
 # ARCHE's owner heard the host "drift" across pieces. The size is the config's
 # `chunk_chars` ([tts]); `herde lab` compares sizes by ear.
@@ -77,6 +82,17 @@ class Sampling:
     repetition_penalty: float = REPETITION_PENALTY
 
 
+@dataclass(frozen=True)
+class Settings:
+    """What shapes every take besides its words, voice and temperature: the owner's config, or a project's profile."""
+
+    chunk_chars: int = CHUNK_CHARS
+    pause_ms: int = PAUSE_MS
+    top_k: int = 50
+    top_p: float = 1.0
+    repetition_penalty: float = REPETITION_PENALTY
+
+
 class Backend(Protocol):
     """Speaks one piece of text: 16-bit mono PCM and its sample rate."""
 
@@ -85,13 +101,39 @@ class Backend(Protocol):
     @property
     def ready(self) -> bool: ...
 
+    @property
+    def dtype(self) -> str:
+        """The number format the weights run in once loaded: bf16, fp16 or fp32 ("" before, and for the stub)."""
+        ...
+
+    def pins(self) -> tuple[str, str]:
+        """The checkpoints it loads, or would load for an own voice, as repo@revision: what a profile is compared with."""
+        ...
+
+    def checkpoints(self) -> tuple[str, str]:
+        """The checkpoints loaded, as repo@revision: CustomVoice, and Base once a recording needed it ("" until then)."""
+        ...
+
     def load(self, refs: list[Reference]) -> None: ...
+
+    def fetch_clone(self) -> None:
+        """The Base model's files, downloaded without the GPU: a profile's first own voice must not stall the takes."""
+        ...
+
+    def add(self, refs: list[Reference]) -> None:
+        """Recordings learnt while the engine runs (the Base model loaded first, if this is the first)."""
+        ...
 
     def seed(self, seed: int) -> None: ...
 
     def preset(self, text: str, speaker: str, language: str, instruct: str, sampling: Sampling) -> tuple[bytes, int]: ...
 
     def clone(self, text: str, ref: Reference, language: str, sampling: Sampling) -> tuple[bytes, int]: ...
+
+
+def at(repo: str, revision: str) -> str:
+    """A checkpoint as setups and profiles name it: repo@revision (the repo alone when not pinned)."""
+    return f"{repo}@{revision}" if repo and revision else repo
 
 
 def language_name(code: str) -> str:
@@ -159,57 +201,97 @@ class TtsEngine:
 
     def __init__(self, backend: Backend, own: dict[str, OwnVoice] | None = None, chunk_chars: int = CHUNK_CHARS, max_chars: int = 2000):
         self.backend = backend
-        # Our own voices by lower-case name; the Base model is loaded only for them.
+        # The owner's own voices by lower-case name, for every project without a profile; the Base model is loaded only for own voices.
         self.own = own or {}
-        self.chunk_chars = chunk_chars
+        # A profile's own voices, per project: for that project only, in place of the owner's (PROTOCOL.md, Profiles).
+        self.projects: dict[str, dict[str, OwnVoice]] = {}
+        self.settings = Settings(chunk_chars=chunk_chars)
         self.max_chars = max_chars
 
     @property
     def ready(self) -> bool:
         return self.backend.ready
 
-    def load(self) -> None:
-        self.backend.load([ref for voice in self.own.values() for ref in voice.refs.values()])
+    @property
+    def chunk_chars(self) -> int:
+        return self.settings.chunk_chars
 
-    def voices(self) -> list[dict]:
-        """As the caps list them: Qwen's presets in every language, then our own in the languages they were recorded in."""
+    def own_for(self, project: str | None) -> dict[str, OwnVoice]:
+        """The own voices a project may ask for: its profile's, else the owner's."""
+        return self.projects[project] if project is not None and project in self.projects else self.own
+
+    def refs(self) -> list[Reference]:
+        """Every recording the Base model must know: the owner's, and every profile's."""
+        found: dict = {}
+        # A snapshot: the loop may set another project's voices while the speech thread learns.
+        for voices in (self.own, *tuple(self.projects.values())):
+            for voice in voices.values():
+                for ref in voice.refs.values():
+                    found.setdefault(ref.path, ref)
+        return list(found.values())
+
+    def load(self) -> None:
+        self.backend.load(self.refs())
+
+    def learn(self, project: str, voices: dict[str, OwnVoice]) -> None:
+        """A profile's voices for its project. In the speech thread: the Base model may have to load first,
+        and the voices are offered only once their recordings are learnt."""
+        if self.backend.ready:
+            known = {ref.path for ref in self.refs()}
+            new = [ref for voice in voices.values() for ref in voice.refs.values() if ref.path not in known]
+            if new:
+                self.backend.add(new)
+        self.projects[project] = voices
+
+    def forget(self, project: str) -> None:
+        """The project dropped its profile: the owner's voices again."""
+        self.projects.pop(project, None)
+
+    def voices(self, project: str | None = None) -> list[dict]:
+        """As the caps list them: Qwen's presets in every language, then the own voices in the languages they were recorded in."""
         presets = [{"id": v, "label": v.replace("_", " "), "langs": sorted(LANGUAGES), "instruct": True} for v in VOICES]
-        own = [{"id": o.name, "label": f"{o.name} (own voice)", "langs": o.languages, "instruct": False, "own": True} for o in self.own.values()]
+        own = [{"id": o.name, "label": f"{o.name} (own voice)", "langs": o.languages, "instruct": False, "own": True} for o in self.own_for(project).values()]
         return presets + own
 
-    def caps(self, chars_per_s: float) -> dict:
+    def voice_files(self, project: str | None = None) -> dict[str, dict[str, str]]:
+        """The own voices' recordings by SHA-256, as the caps' setup reports them."""
+        return {o.name: {lang: ref.sha256 for lang, ref in sorted(o.refs.items())} for o in self.own_for(project).values()}
+
+    def caps(self, chars_per_s: float, project: str | None = None) -> dict:
         return {
-            "kind": "tts", "model": MODEL_NAME, "location": "local", "voices": self.voices(),
+            "kind": "tts", "model": MODEL_NAME, "location": "local", "voices": self.voices(project),
             "max_chars": self.max_chars, "speed": {"chars_per_s": max(1, round(chars_per_s))},
         }
 
-    def can(self, model: str, voice: str, lang: str) -> bool:
+    def can(self, model: str, voice: str, lang: str, project: str | None = None) -> bool:
         """Whether an offer is one this worker speaks — exactly what its caps say."""
         if model != MODEL_NAME:
             return False
-        own = self.own.get(voice.lower())
+        own = self.own_for(project).get(voice.lower())
         if own is not None:
             return lang in own.refs
         return lang in LANGUAGES and any(v.lower() == voice.lower() for v in VOICES)
 
-    def route(self, voice: str, lang: str) -> Reference | str:
-        """What speaks a task: our own voice's recording for its language, or the name of Qwen's preset."""
-        own = self.own.get(voice.strip().lower())
+    def route(self, voice: str, lang: str, project: str | None = None) -> Reference | str:
+        """What speaks a task: an own voice's recording for its language, or the name of Qwen's preset."""
+        own = self.own_for(project).get(voice.strip().lower())
         return own.reference(lang) if own is not None else voice_name(voice)
 
     def synthesize(
         self, text: str, voice: str, lang: str, instruct: str = "", temperature: float = 0.7, seed: int = 0,
         chunk_chars: int | None = None, every_sentence: bool = False,
         cancelled: Callable[[], bool] = lambda: False, progress: Callable[[float], None] | None = None,
+        project: str | None = None, settings: Settings | None = None,
     ) -> Speech:
         if not self.backend.ready:
             raise RuntimeError("model not loaded")
         if len(text) > self.max_chars:
             raise TooLarge(f"{len(text)} characters, this worker speaks at most {self.max_chars}")
-        chunks = split_text(text, chunk_chars or self.chunk_chars, every_sentence)
+        s = settings or self.settings
+        chunks = split_text(text, chunk_chars or s.chunk_chars, every_sentence)
         if not chunks:
             raise InvalidTask("no text")
-        target, language = self.route(voice, lang), language_name(lang)
+        target, language = self.route(voice, lang, project), language_name(lang)
         self.backend.seed(max(0, min(4294967295, int(seed))))
         parts: list[bytes] = []
         sample_rate: int | None = None
@@ -218,8 +300,11 @@ class TtsEngine:
                 raise Cancelled()
             if parts and sample_rate is not None:
                 # A short breath between chunks instead of words run together.
-                parts.append(b"\x00\x00" * (sample_rate * PAUSE_MS // 1000))
-            sampling = Sampling(temperature=max(0.0, min(2.0, float(temperature))), max_tokens=max_tokens(chunk))
+                parts.append(b"\x00\x00" * (sample_rate * s.pause_ms // 1000))
+            sampling = Sampling(
+                temperature=max(0.0, min(2.0, float(temperature))), max_tokens=max_tokens(chunk),
+                top_k=s.top_k, top_p=s.top_p, repetition_penalty=s.repetition_penalty,
+            )
             if isinstance(target, Reference):
                 # The clone reads its recording with the recording's words, then speaks on in that voice.
                 # It takes no direction: the moment's delivery stays unused.
