@@ -128,6 +128,26 @@ def test_a_failed_check_keeps_the_station_silent_until_a_check_passes(tmp_path):
     assert claims and claims[0] > failing[0], "offered all along, and taken only once a check passed"
 
 
+class Unlucky(Backend):
+    """A take that runs away with the first seed and is fine with the next: sampling, not a broken setup."""
+
+    def seed(self, seed):
+        self.current = seed
+
+    def preset(self, text, speaker, language, instruct, sampling):
+        pcm, rate = super().preset(text, speaker, language, instruct, sampling)
+        return (pcm * 8, rate) if self.current == 1 else (pcm, rate)
+
+
+def test_a_check_take_that_misses_by_chance_is_spoken_again_with_another_seed(tmp_path):
+    p = station()
+    w = make([p], tmp_path, Unlucky())
+    serve(w, lambda: report(p).get("state") == "ok")
+    checks = last_caps(p)["setup"]["checks"]
+    assert all(c["ok"] for c in checks), "the second seed passes: no failure for one long take"
+    assert [b["profile"]["state"] for b in p.polls() if "profile" in b].count("failing") == 0
+
+
 def test_a_recording_changed_on_disk_is_noticed_and_fetched_again(tmp_path):
     p = station()
     w = make([p], tmp_path)

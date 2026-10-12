@@ -33,7 +33,7 @@ from .engines.tts.core import CODE, Cancelled, InvalidTask, Settings, TooLarge, 
 from .engines.tts.mp3 import EncodeError, encode
 from .engines.tts.voices import OwnVoice
 from .estimates import Speeds
-from .profile import CHECK_SEED, CHECK_TEMPERATURE, DOC_MAX, RETRY_CHECK, RETRY_SYNC, VERIFY_EVERY, Profile, ProfileError, ProfileStore, judge, unmet
+from .profile import CHECK_SEED, CHECK_TEMPERATURE, CHECK_TRIES, DOC_MAX, RETRY_CHECK, RETRY_SYNC, VERIFY_EVERY, Profile, ProfileError, ProfileStore, judge, unmet
 from .profile import parse as parse_profile
 from .protocol import KIND_VERSIONS, MODEL, Offer, Task, TextOutput, TtsInput, caps_hash, poll_body
 from .scheduler import charge, order
@@ -719,15 +719,19 @@ class Worker:
                 return
             results = []
             for take in profile.takes:
+                ok, cps, error = False, 0.0, ""
+                for attempt in range(CHECK_TRIES):
 
-                def work(take=take):
-                    return tts.synthesize(take.text, take.voice, take.lang, "", CHECK_TEMPERATURE, CHECK_SEED, project=link.name, settings=profile.settings)
+                    def work(take=take, seed=CHECK_SEED + attempt):
+                        return tts.synthesize(take.text, take.voice, take.lang, "", CHECK_TEMPERATURE, seed, project=link.name, settings=profile.settings)
 
-                try:
-                    speech = await self._with_speech(work)
-                    ok, cps, error = judge(speech.pcm16, speech.sample_rate, take.text, silence_ok=tts.backend.name == "stub")
-                except Exception as e:  # the model failed, or the voice is missing: that is what the check is for
-                    ok, cps, error = False, 0.0, f"{type(e).__name__}: {e}"
+                    try:
+                        speech = await self._with_speech(work)
+                        ok, cps, error = judge(speech.pcm16, speech.sample_rate, take.text, silence_ok=tts.backend.name == "stub")
+                    except Exception as e:  # the model failed, or the voice is missing: that is what the check is for
+                        ok, cps, error = False, 0.0, f"{type(e).__name__}: {e}"
+                    if ok:
+                        break
                 result: dict = {"voice": take.voice, "lang": take.lang, "ok": ok, "cps": cps}
                 if error:
                     result["error"] = error[:200]

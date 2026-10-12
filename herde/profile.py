@@ -48,6 +48,9 @@ SILENT_RMS = 100.0
 CLIPPED_SHARE = 0.01
 CHECK_TEMPERATURE = 0.7
 CHECK_SEED = 1
+# A take is sampled: one may run long or short by chance, which is why a project asks again for a result
+# that does not fit its words. A check takes another seed the same way, and fails only when every try does.
+CHECK_TRIES = 3
 
 
 class ProfileError(ValueError):

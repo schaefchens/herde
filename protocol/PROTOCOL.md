@@ -280,7 +280,7 @@ A project that lets many computers speak in one voice needs them all set up alik
   - not be silent and not clip;
   - run as long as its words need (6–30 characters a second).
 
-  A failed check is tried again after 10 minutes.
+  A take is sampled, and one may miss by chance: a take that misses is spoken again with another seed, up to three times, and the check fails only when every try misses. A failed check is tried again after 10 minutes.
 - **Reported.** Every poll carries `profile`:
   - `hash`: the profile the worker runs;
   - `state` (below);
