@@ -4,5 +4,6 @@ Copyright 2026 schaefchens (https://github.com/schaefchens) and the herde contri
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 The Docker images also contain third-party software under its own licenses, among them
-Python, ffmpeg, PyTorch, Qwen3-TTS (qwen-tts) and, in the cuda image, NVIDIA's CUDA libraries.
+Python, ffmpeg, PyTorch, Qwen3-TTS (qwen-tts) and, in the cuda image, NVIDIA's CUDA libraries;
+in the rocm image, AMD's ROCm libraries.
 Models are downloaded when the worker first starts and come with their own licenses.

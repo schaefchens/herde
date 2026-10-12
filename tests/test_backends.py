@@ -51,7 +51,9 @@ def fake_torch(monkeypatch):
     FakeQwenModel.loaded = []
     seeds = []
     cuda = types.SimpleNamespace(is_available=lambda: True, is_bf16_supported=lambda: True, manual_seed_all=lambda s: seeds.append(("cuda", s)))
-    torch = types.SimpleNamespace(cuda=cuda, bfloat16="bf16", float16="fp16", float32="fp32", manual_seed=lambda s: seeds.append(("cpu", s)))
+    torch = types.SimpleNamespace(
+        cuda=cuda, version=types.SimpleNamespace(hip=None), bfloat16="bf16", float16="fp16", float32="fp32", manual_seed=lambda s: seeds.append(("cpu", s)),
+    )
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "qwen_tts", types.SimpleNamespace(Qwen3TTSModel=FakeQwenModel))
     return seeds
@@ -91,6 +93,17 @@ def test_torch_on_an_older_card_uses_fp16_and_without_a_gpu_says_how_to_start(fa
     assert FakeQwenModel.loaded[-1].kwargs["dtype"] == "fp16"
     sys.modules["torch"].cuda.is_available = lambda: False
     with pytest.raises(RuntimeError, match="NVIDIA"):
+        TorchBackend("m").load([])
+
+
+def test_torch_through_rocm_speaks_on_an_amd_gpu_as_on_cuda_and_without_one_says_how_to_start(fake_torch):
+    from herde.engines.tts.torch_backend import TorchBackend
+
+    sys.modules["torch"].version.hip = "7.2.26015"
+    TorchBackend("m").load([])
+    assert FakeQwenModel.loaded[-1].kwargs == {"device_map": "cuda:0", "dtype": "bf16"}, "ROCm's torch names an AMD GPU cuda"
+    sys.modules["torch"].cuda.is_available = lambda: False
+    with pytest.raises(RuntimeError, match=r"AMD.*/dev/kfd.*compose\.amd\.yaml"):
         TorchBackend("m").load([])
 
 

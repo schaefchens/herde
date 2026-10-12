@@ -1,8 +1,8 @@
 name: images
 
 # herde's images on ghcr.io/schaefchens/herde, for anyone who runs a worker:
-# - a version tag (v0.2.0): :0.2.0-base and :0.2.0-cuda, and the moving :base and :cuda;
-# - by hand (Actions › images › Run workflow): :edge-base and :edge-cuda only.
+# - a version tag (v0.2.0): :0.2.0-base, :0.2.0-cuda and :0.2.0-rocm, and the moving :base, :cuda and :rocm;
+# - by hand (Actions › images › Run workflow): :edge-base, :edge-cuda and :edge-rocm only.
 on:
   push:
     tags: ["v*"]
@@ -99,4 +99,55 @@ jobs:
         run: |
           docker run --rm --entrypoint python "${{ steps.tags.outputs.first }}" -c \
             "import torch, qwen_tts; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
+          docker run --rm "${{ steps.tags.outputs.first }}" --help
+
+  rocm:
+    runs-on: ubuntu-latest
+    steps:
+      # PyTorch with ROCm is 6 GB to download and 13 GB unpacked, more than the CUDA one: GHC's toolchain goes too.
+      - name: room for the ROCm image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          docker image prune --all --force
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: tags
+        name: tags
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "list=$IMAGE:${GITHUB_REF#refs/tags/v}-rocm,$IMAGE:rocm" >> "$GITHUB_OUTPUT"
+            echo "first=$IMAGE:${GITHUB_REF#refs/tags/v}-rocm" >> "$GITHUB_OUTPUT"
+          else
+            echo "list=$IMAGE:edge-rocm" >> "$GITHUB_OUTPUT"
+            echo "first=$IMAGE:edge-rocm" >> "$GITHUB_OUTPUT"
+          fi
+      # Qwen3-TTS on an AMD GPU: amd64, Linux only (Docker Desktop on Windows passes no AMD GPU through).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: rocm
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.list }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.description=herde: a worker that does AI work for projects that host its protocol (Qwen3-TTS on an AMD GPU through ROCm, text through Ollama)
+      # The builder's copy goes first: it and the image pulled to run would not both fit.
+      - name: room to run it
+        run: |
+          docker buildx prune --all --force
+          df -h /
+      # No GPU here: this proves the packages are there and import, not that they speak.
+      - name: the speech packages import
+        run: |
+          docker run --rm --entrypoint python "${{ steps.tags.outputs.first }}" -c \
+            "import torch, qwen_tts; print('torch', torch.__version__, 'rocm', torch.version.hip)"
           docker run --rm "${{ steps.tags.outputs.first }}" --help

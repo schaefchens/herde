@@ -3,8 +3,8 @@ our own, cloned from a recording (engines.tts.voices).
 
 A text is spoken in pieces (`chunk_chars`), each a take of its own whose
 delivery starts afresh; between two pieces a project's cancel or the
-worker's stop ends the task. The backends (mlx on a Mac, torch on NVIDIA, a
-silent stub for tests) only speak one piece: everything a project can hear —
+worker's stop ends the task. The backends (mlx on a Mac, torch on NVIDIA or AMD,
+a silent stub for tests) only speak one piece: everything a project can hear —
 where a text is cut, the pause between pieces, the length check's inputs — is
 decided here, the same on every computer.
 """

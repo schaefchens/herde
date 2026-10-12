@@ -29,7 +29,7 @@ text_input_chars = 200000
 text_max_tokens = 4096
 
 [tts]
-# mlx (a Mac), torch (NVIDIA, the cuda image), stub (silence, for tests), or "" for no speech.
+# mlx (a Mac), torch (NVIDIA or AMD: the cuda or rocm image), stub (silence, for tests), or "" for no speech.
 backend = ""
 # The checkpoints; the defaults suit the backend (mlx: mlx-community's bf16, pinned; torch: Qwen's).
 # model = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
@@ -42,7 +42,7 @@ backend = ""
 # voices = "~/.config/herde/voices"
 # Characters per take: each piece of a text is spoken on its own. `herde lab` compares sizes by ear.
 chunk_chars = 300
-# torch only: which GPU.
+# torch only: which GPU. ROCm names an AMD GPU cuda too.
 # device = "cuda:0"
 # A take may run this many times its expected length (plus 30 s) before it is given back.
 task_timeout_factor = 4.0

@@ -1,4 +1,5 @@
-"""Qwen3-TTS through the official `qwen-tts` package (PyTorch) on an NVIDIA GPU — the `cuda` image.
+"""Qwen3-TTS through the official `qwen-tts` package (PyTorch) on an NVIDIA GPU — the `cuda` image —
+or an AMD one — the `rocm` image, whose torch calls an AMD GPU `cuda` too.
 
 The same checkpoints as on a Mac, so a host sounds alike wherever it is
 spoken: CustomVoice for the presets (with direction), Base for our own voices
@@ -42,8 +43,10 @@ class TorchBackend:
         from qwen_tts import Qwen3TTSModel
 
         if self.device.startswith("cuda") and not torch.cuda.is_available():
+            if torch.version.hip:
+                raise RuntimeError("no AMD GPU visible: start the container with /dev/kfd, /dev/dri and the groups video and render (compose.amd.yaml)")
             raise RuntimeError("no CUDA GPU visible: start the container with the NVIDIA runtime (compose.nvidia.yaml)")
-        # bf16 where the GPU has it (Ampere and newer); fp16 on older cards; fp32 on a CPU.
+        # bf16 where the GPU has it (NVIDIA's Ampere and newer; torch says every AMD GPU); fp16 on older cards; fp32 on a CPU.
         if self.device.startswith("cuda"):
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         else:

@@ -28,10 +28,19 @@ protocol at `/api/worker/v2`.
 |---|---|---|---|
 | Mac with Apple Silicon | mlx-audio on the GPU | Ollama (the app) | natively: Docker cannot reach a Mac's GPU |
 | Linux or Windows, NVIDIA (8 GB+) | the official `qwen-tts` on CUDA | Ollama container | Docker, `herde:cuda` |
+| Linux, AMD (8 GB+): Radeon RX 6800 or newer, Ryzen AI 300, Ryzen AI Max | the official `qwen-tts` on ROCm | Ollama container (ROCm) | Docker, `herde:rocm` |
 | Linux or Windows, CPU only | — | Ollama container (slow) | Docker, `herde:base` |
 
 On Windows, Docker Desktop with WSL2 passes an NVIDIA GPU through; AMD and
 Intel GPUs are not supported in Docker there yet.
+
+A Ryzen AI APU shares the computer's memory with its GPU, as a Mac does: by
+default the GPU may use up to half of it. That is plenty for speech; for large
+text models, AMD's [Strix Halo guide](https://rocm.docs.amd.com/en/latest/how-to/system-optimization/strixhalo.html)
+shows how to give it more, and which Linux these APUs need (a kernel 6.18.4 or
+newer; on Ubuntu 24.04 the current HWE kernel). A Radeon that PyTorch's ROCm
+build does not cover (an RX 6600 or 6700, a Radeon 780M) may still run, posing
+as its nearest kin: see `docker/compose.amd.yaml`.
 
 ## Install on a Mac
 
@@ -57,9 +66,11 @@ voices of your own). The log is `~/Library/Logs/herde.log`.
 ## Install with Docker (Linux, Windows)
 
 The images are on GitHub's registry: `ghcr.io/schaefchens/herde:cuda` (speech
-and text, an NVIDIA GPU with 8 GB or more) and `:base` (text through Ollama, no
-speech). On Linux you need the NVIDIA Container Toolkit; on Windows, Docker
-Desktop with WSL2 and a current NVIDIA driver. Nothing to clone or build.
+and text, an NVIDIA GPU with 8 GB or more), `:rocm` (the same on an AMD GPU,
+Linux only) and `:base` (text through Ollama, no speech). On Linux you need the
+NVIDIA Container Toolkit for an NVIDIA GPU, and for an AMD one only its amdgpu
+driver; on Windows, Docker Desktop with WSL2 and a current NVIDIA driver.
+Nothing to clone or build.
 
 **To lend your GPU to a project for speech** (what ARCHE asks for), two
 commands, each on one line (they work in a Linux shell and in PowerShell):
@@ -67,6 +78,15 @@ commands, each on one line (they work in a Linux shell and in PowerShell):
 ```
 docker run --rm -v herde:/config ghcr.io/schaefchens/herde:cuda join <url> <code>
 docker run -d --name herde --restart unless-stopped --gpus all --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges -v herde:/config -v herde-cache:/cache -p 127.0.0.1:8737:8737 ghcr.io/schaefchens/herde:cuda
+```
+
+With an AMD GPU, the `rocm` image (about 6 GB to download), and the GPU's
+devices in place of `--gpus all`; the worker reaches them through the groups
+video and render:
+
+```
+docker run --rm -v herde:/config ghcr.io/schaefchens/herde:rocm join <url> <code>
+docker run -d --name herde --restart unless-stopped --device /dev/kfd --device /dev/dri --group-add $(getent group video | cut -d: -f3) --group-add $(getent group render | cut -d: -f3) --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges -v herde:/config -v herde-cache:/cache -p 127.0.0.1:8737:8737 ghcr.io/schaefchens/herde:rocm
 ```
 
 The first joins with the invite the project's admin gave you: it writes the
@@ -77,30 +97,41 @@ and after every restart; the first start downloads the speech model (about
 - the status page, with Pause and Resume: <http://127.0.0.1:8737>;
 - pause from a shell: `docker exec herde herde pause 2h`, resume: `docker exec herde herde resume`;
 - what it does: `docker logs -f herde`;
-- an update: `docker pull ghcr.io/schaefchens/herde:cuda`, `docker rm -f herde`, then the second command again;
+- an update: `docker pull ghcr.io/schaefchens/herde:cuda` (or `:rocm`), `docker rm -f herde`, then the second command again;
 - to stop for good: `docker rm -f herde` (and `docker volume rm herde herde-cache` to forget the key and the model).
 
-**With Ollama for text too**, use the compose files in `docker/`:
+**With Ollama for text too**, use the compose files in `docker/`; with an
+NVIDIA GPU:
 
 ```
 mkdir herde && cd herde && mkdir config cache
 curl -fsSLO https://raw.githubusercontent.com/schaefchens/herde/main/docker/compose.yaml
 curl -fsSLO https://raw.githubusercontent.com/schaefchens/herde/main/docker/compose.nvidia.yaml
-docker compose run --rm herde join https://radio.example.org/api/worker/v2 7KQ3-M2XP-…
-docker compose -f compose.yaml -f compose.nvidia.yaml up -d      # with an NVIDIA GPU
-docker compose up -d                                           # without: text only
+docker compose -f compose.yaml -f compose.nvidia.yaml run --rm herde join https://radio.example.org/api/worker/v2 7KQ3-M2XP-…
+docker compose -f compose.yaml -f compose.nvidia.yaml up -d
 ```
 
-`join` writes `config/config.toml` and the project's key into `config/keys/`.
-On Linux the container runs as your user (put `HERDE_UID` and `HERDE_GID` into
-`.env` if yours is not 1000). Text models come from the Ollama container:
-`docker compose exec ollama ollama pull qwen3.6:35b`, then list it in the
-config (`[[text.models]]`, see `docker/config.example.toml`).
+With an AMD GPU, `compose.amd.yaml` takes the place of `compose.nvidia.yaml`,
+once the ids of the groups video and render are in `.env`:
+
+```
+echo "HERDE_VIDEO_GID=$(getent group video | cut -d: -f3)" >> .env
+echo "HERDE_RENDER_GID=$(getent group render | cut -d: -f3)" >> .env
+```
+
+Without a GPU, leave the second file out: text only, slowly. Join with the
+files you start with: the GPU's image writes its speech backend into the first
+config. `join` writes `config/config.toml` and the project's key into
+`config/keys/`. On Linux the container runs as your user (put `HERDE_UID` and
+`HERDE_GID` into `.env` if yours is not 1000). Text models come from the Ollama
+container: `docker compose exec ollama ollama pull qwen3.6:35b`, then list it in
+the config (`[[text.models]]`, see `docker/config.example.toml`).
 
 Either way the container runs as a plain user on a read-only file system, with
 no capabilities; the key stays in a file, never in an environment variable.
 To build an image yourself: `docker build -f docker/Dockerfile --target cuda -t
-ghcr.io/schaefchens/herde:cuda .` (compose then uses yours).
+ghcr.io/schaefchens/herde:cuda .` (`rocm` twice for AMD; compose then uses
+yours).
 
 ## Joining, pausing, hours
 

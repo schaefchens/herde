@@ -1,4 +1,4 @@
-"""Speech: Qwen3-TTS on a backend that fits the machine (mlx on a Mac, torch on NVIDIA, a silent stub)."""
+"""Speech: Qwen3-TTS on a backend that fits the machine (mlx on a Mac, torch on NVIDIA or AMD, a silent stub)."""
 
 from __future__ import annotations
 

@@ -6,6 +6,8 @@
 #   docker compose run --rm herde join <url> <code>  (the invite from the project's admin)
 #   docker compose up -d                            (CPU: text only, slowly)
 #   docker compose -f compose.yaml -f compose.nvidia.yaml up -d   (an NVIDIA GPU: speech and text)
+#   docker compose -f compose.yaml -f compose.amd.yaml up -d      (an AMD GPU, on Linux: the same)
+# With a GPU, join with the same two files: the GPU's image writes its speech backend into the first config.
 #
 # On Linux, the worker runs as your user so it can write ./config and ./cache:
 # put HERDE_UID=$(id -u) and HERDE_GID=$(id -g) into .env when yours is not 1000.

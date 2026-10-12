@@ -7,9 +7,9 @@ ui_host = "0.0.0.0"
 # windows = ["Mon-Fri 18:00-08:00", "Sat-Sun"]
 
 [tts]
-# "torch" in the cuda image (an NVIDIA GPU with 8 GB or more); "" for none.
+# "torch" in the cuda and rocm images (an NVIDIA or AMD GPU with 8 GB or more); "" for none.
 backend = "torch"
-# device = "cuda:0"
+# device = "cuda:0"   (an AMD GPU's name too, through ROCm)
 
 [text]
 ollama = "http://ollama:11434"

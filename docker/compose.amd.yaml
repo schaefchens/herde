@@ -1,0 +1,30 @@
+# With an AMD GPU on Linux (a Radeon RX 6800 or newer, a Ryzen AI 300 or Ryzen AI Max), through ROCm:
+#   docker compose -f compose.yaml -f compose.amd.yaml up -d
+# The worker runs as your user and reaches the GPU through the groups video and render. Their ids differ
+# from one Linux to the next; put them into .env first:
+#   echo "HERDE_VIDEO_GID=$(getent group video | cut -d: -f3)" >> .env
+#   echo "HERDE_RENDER_GID=$(getent group render | cut -d: -f3)" >> .env
+# With SELinux (Fedora), containers may use devices only after: sudo setsebool -P container_use_devices=1
+#
+# A GPU that PyTorch's ROCm build does not cover (an RX 6600 or 6700, a Radeon 780M) may run posing as its
+# nearest kin: HSA_OVERRIDE_GFX_VERSION below, for both services: "10.3.0" for those Radeons, "11.0.0" for the 780M.
+services:
+  herde:
+    image: ghcr.io/schaefchens/herde:rocm
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - "${HERDE_VIDEO_GID:?put the id of the group video into .env (see compose.amd.yaml)}"
+      - "${HERDE_RENDER_GID:?put the id of the group render into .env (see compose.amd.yaml)}"
+    # environment:
+    #   HSA_OVERRIDE_GFX_VERSION: "11.0.0"
+
+  ollama:
+    # compose.yaml's version, built for ROCm.
+    image: ollama/ollama:0.40.2-rocm
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    # environment:
+    #   HSA_OVERRIDE_GFX_VERSION: "11.0.0"
