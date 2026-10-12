@@ -80,7 +80,7 @@ docker run --rm -v herde:/config ghcr.io/schaefchens/herde:cuda join <url> <code
 docker run -d --name herde --restart unless-stopped --gpus all --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges -v herde:/config -v herde-cache:/cache -p 127.0.0.1:8737:8737 ghcr.io/schaefchens/herde:cuda
 ```
 
-With an AMD GPU, the `rocm` image (about 6 GB to download), and the GPU's
+With an AMD GPU, the `rocm` image (about 7 GB to download), and the GPU's
 devices in place of `--gpus all`; the worker reaches them through the groups
 video and render:
 

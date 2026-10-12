@@ -5,7 +5,7 @@ the worker connects out to every project it serves, chooses the most urgent
 task it can finish in time, runs it on its own models and hands back the result.
 """
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 # The protocol this worker speaks (version 1 was ARCHE's first voice-worker API).
 PROTOCOL = 2
 USER_AGENT = f"herde/{VERSION}"

@@ -2,7 +2,7 @@
 # herde's images. Build from the repository's root:
 #   docker build -f docker/Dockerfile --target base -t herde:base .
 #   docker build -f docker/Dockerfile --target cuda -t herde:cuda .   (amd64; several GB)
-#   docker build -f docker/Dockerfile --target rocm -t herde:rocm .   (amd64; about 15 GB)
+#   docker build -f docker/Dockerfile --target rocm -t herde:rocm .   (amd64; about 17 GB)
 # or through docker/compose.yaml. A Mac runs herde natively instead: Docker cannot reach its GPU.
 
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm
